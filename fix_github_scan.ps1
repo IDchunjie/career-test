@@ -11,33 +11,60 @@ $ips = @(
     "20.200.245.247", "20.233.83.145"
 )
 
+function Test-GitHubIp($ip) {
+    $code = & curl.exe -s -o NUL -w "%{http_code}" --max-time 6 --resolve "github.com:443:$ip" https://github.com 2>$null
+    if (-not $code) { return "000" }
+    return [string]$code
+}
+
 $working = $null
 foreach ($ip in $ips) {
-    $code = & curl.exe -s -o NUL -w "%{http_code}" --max-time 6 --resolve "github.com:443:$ip" https://github.com 2>$null
-    if (-not $code) { $code = "000" }
-    Write-Host ("  测试 {0,-18} -> {1}" -f $ip, $code)
+    $code = Test-GitHubIp $ip
+    Write-Host ("  try {0,-18} -> {1}" -f $ip, $code)
     if ($code -eq "200") { $working = $ip; break }
 }
 
 if (-not $working) {
     Write-Host ""
-    Write-Host "当前没有可用的 GitHub IP。" -ForegroundColor Yellow
-    Write-Host "可以稍后再试，或者用手机开热点再运行本脚本。"
+    Write-Host "No working GitHub IP right now." -ForegroundColor Yellow
+    Write-Host "Try again later, or switch to a phone hotspot."
     exit 1
 }
 
-Copy-Item $hosts "$hosts.bak" -Force
+# 读 hosts（用 .NET，免得管道遇到编码/锁问题）
+$text = ""
+for ($i = 1; $i -le 3; $i++) {
+    try { $text = [System.IO.File]::ReadAllText($hosts); break }
+    catch { Start-Sleep -Seconds 1 }
+}
 
-$lines = Get-Content $hosts -ErrorAction SilentlyContinue |
-    Where-Object { $_ -notmatch "github\.com" }
-$lines = @($lines) + @("", "$working github.com")
+$kept = @()
+foreach ($line in ($text -split "`r?`n")) {
+    if ($line -match "github\.com") { continue }
+    $kept += $line
+}
+$newText = ($kept -join "`r`n").TrimEnd() + "`r`n" + "$working github.com`r`n"
 
-Set-Content -Path $hosts -Value $lines -Encoding ASCII
-ipconfig /flushdns | Out-Null
+$ok = $false
+for ($i = 1; $i -le 3; $i++) {
+    try {
+        [System.IO.File]::WriteAllText($hosts, $newText, [System.Text.Encoding]::ASCII)
+        $ok = $true
+        break
+    } catch {
+        Write-Host "  hosts busy, retry $i ..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 2
+    }
+}
 
-Write-Host ""
-Write-Host ("已写入: {0} github.com" -f $working) -ForegroundColor Green
+if ($ok) {
+    ipconfig /flushdns | Out-Null
+    Write-Host ""
+    Write-Host ("OK: {0} github.com" -f $working) -ForegroundColor Green
+} else {
+    Write-Host "Could not write hosts (file busy). Not fatal if github.com already works." -ForegroundColor Yellow
+}
 
 Start-Sleep -Seconds 1
 $test = & curl.exe -s -o NUL -w "%{http_code}" --max-time 10 https://github.com 2>$null
-Write-Host ("验证访问 github.com -> {0}" -f $test)
+Write-Host ("check github.com -> {0}" -f $test)
