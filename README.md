@@ -62,7 +62,29 @@ E:\tools\PortableGit\cmd\git.exe push -u origin main
 
 注意：这是 debug 签名的测试包，能装能用，但上不了应用商店。
 
-## 以后想做成安卓 APK（本机 WSL 方式）
+## 安卓安装包（已构建成功）
+
+`dist/career-test.apk`（37.5 MB，arm64-v8a，debug 签名）
+
+- 系统要求：Android 7.0 及以上（minSdk 24），64 位 ARM 手机
+- 安装：把 APK 传到手机（数据线 / 微信文件传输 / QQ），在文件管理器里点开，
+  按提示允许“安装未知应用”
+- 第一次启动要解压资源，可能等 10~20 秒，属正常
+- 这是测试签名，能装能用，但不能上应用商店
+
+重新构建：改完代码 `git push`，GitHub Actions 会自动编译，
+在仓库 Actions 页的 Artifacts 里下载新的 APK。
+
+## 后续要重新构建 APK
+
+改完代码推送到 GitHub 即可（`main` 分支），云端会自动编译。
+本地推送走 SSH（`ssh.github.com:443`），不受 github.com 网页被墙影响：
+
+```
+git push origin main
+```
+
+## 以后想在本机打 APK（WSL 方式，可选）
 
 Kivy 打包 APK 必须用 Linux 环境（Windows 上 buildozer 不支持）：
 
