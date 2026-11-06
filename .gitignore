@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+build/
+dist/
+bin/
+.buildozer/
+shots/
+assets/*.otf
