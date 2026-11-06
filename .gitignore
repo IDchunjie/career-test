@@ -16,3 +16,5 @@ apk_out/
 preview/click_test*.png
 new_apk/
 new_apk.zip
+v3/
+dist/
