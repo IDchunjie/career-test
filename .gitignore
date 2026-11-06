@@ -12,3 +12,4 @@ preview/auth_screen*.png
 .ssh/
 logs*.zip
 logs*/
+apk_out/
