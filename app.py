@@ -20,6 +20,7 @@ from kivy.uix.label import Label
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.screenmanager import FadeTransition
 from kivy.uix.scrollview import ScrollView
+from kivy.utils import platform
 
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
@@ -619,7 +620,9 @@ class CareerApp(MDApp):
         self.theme_cls.primary_palette = "Teal"
         self.theme_cls.theme_style = "Light"
 
-        Window.size = (400, 680)
+        # 手机上不需要（也不能）指定窗口大小
+        if platform not in ("android", "ios"):
+            Window.size = (400, 680)
         Window.clearcolor = BG
 
         self.sm = MDScreenManager()
