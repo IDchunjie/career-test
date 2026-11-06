@@ -48,6 +48,8 @@ jobs:
           buildozer --version
 
       - name: Build debug APK
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
           buildozer -v android debug
 
