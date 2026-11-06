@@ -11,7 +11,7 @@ version = 1.0
 
 # KivyMD 2.0 在安卓上不需要 materialshapes（那是 LoadingIndicator 用的），
 # 所以这里不列 pycairo，避免触发它的本地编译。
-requirements = python3,kivy==2.3.1,kivymd==2.0.0,materialyoucolor==3.0.4,asynckivy,pillow
+requirements = python3,kivy==2.3.1,kivymd==2.0.0,materialyoucolor==3.0.4,asynckivy==0.6.4,asyncgui==0.6.3,pillow
 
 orientation = portrait
 fullscreen = 0
