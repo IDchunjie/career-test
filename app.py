@@ -9,6 +9,7 @@
 
 import json
 import os
+import traceback
 
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
@@ -18,7 +19,7 @@ from kivy.metrics import dp
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.uix.progressbar import ProgressBar
-from kivy.uix.screenmanager import FadeTransition
+from kivy.uix.screenmanager import NoTransition
 from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
 
@@ -626,7 +627,8 @@ class CareerApp(MDApp):
         Window.clearcolor = BG
 
         self.sm = MDScreenManager()
-        self.sm.transition = FadeTransition(duration=0.15)
+        # 安卓上淡入淡出转场偶尔会把界面搞崩，直接不用转场
+        self.sm.transition = NoTransition()
         self._nav = 0
 
         self.holland = None
@@ -635,18 +637,76 @@ class CareerApp(MDApp):
         self.mbti_counts = None
         self.mbti_index = 0
 
-        self.go_home()
+        Window.bind(on_keyboard=self._on_keyboard)
+
+        self._swap(HomeScreen(self))
         return self.sm
 
     # ---------- 导航 ----------
     def show(self, screen):
-        """只保留当前这一屏，避免屏幕越堆越多。"""
-        if self.sm.screens:
-            for old in list(self.sm.screens):
-                self.sm.remove_widget(old)
-        self._nav += 1
-        screen.name = f"screen{self._nav}"
-        self.sm.add_widget(screen)
+        """切换屏幕。
+
+        延后一帧再切：触摸/按钮事件还在派发时就把当前屏幕删掉，
+        在安卓上容易导致闪退（桌面版一般没事）。
+        """
+        Clock.schedule_once(lambda dt: self._swap(screen), 0)
+
+    def _swap(self, screen):
+        try:
+            if self.sm.screens:
+                for old in list(self.sm.screens):
+                    self.sm.remove_widget(old)
+            self._nav += 1
+            screen.name = f"screen{self._nav}"
+            self.sm.add_widget(screen)
+        except Exception:
+            self._show_error(traceback.format_exc())
+
+    def _show_error(self, text):
+        """把异常显示在屏幕上，方便截图反馈。"""
+        try:
+            screen = MDScreen()
+            box = MDBoxLayout(
+                orientation="vertical",
+                padding=[dp(14), dp(14), dp(14), dp(14)],
+                spacing=dp(8),
+            )
+            box.add_widget(txt("出错了，请把这一页截图发给开发者", 16, bold=True))
+            scroll = ScrollView(do_scroll_x=False)
+            content = MDLabel(
+                text=text,
+                font_size="11sp",
+                theme_font_size="Custom",
+                theme_text_color="Custom",
+                text_color=TEXT,
+                halign="left",
+                valign="top",
+                size_hint_y=None,
+                adaptive_height=True,
+                text_size=(self.sm.width - dp(28), None) if self.sm.width else (300, None),
+            )
+            scroll.add_widget(content)
+            box.add_widget(scroll)
+            screen.add_widget(box)
+
+            if self.sm.screens:
+                for old in list(self.sm.screens):
+                    self.sm.remove_widget(old)
+            self._nav += 1
+            screen.name = f"screen{self._nav}"
+            self.sm.add_widget(screen)
+        except Exception:
+            pass
+
+    def _on_keyboard(self, window, key, *args):
+        """安卓返回键：不在首页就回首页，在首页就交给系统退出。"""
+        if key == 27:
+            current = self.sm.current_screen if self.sm.screens else None
+            if isinstance(current, HomeScreen):
+                return False
+            self.go_home()
+            return True
+        return False
 
     def go_home(self):
         self.show(HomeScreen(self))
