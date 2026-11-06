@@ -6,3 +6,6 @@ bin/
 .buildozer/
 shots/
 assets/*.otf
+logs_extract/
+logs.zip
+preview/auth_screen*.png
