@@ -235,9 +235,12 @@ class OptionRow(ButtonBehavior, BoxLayout):
         self.add_widget(self._label)
 
         self._relayout()
+        # 布局稳定后再画一次，避免最后一行圆圈停在中间态坐标
+        Clock.schedule_once(lambda dt: self._sync(), 0)
 
     def _relayout(self, *args):
         self.height = max(dp(self.MIN_H), self._label.height + dp(20))
+        Clock.schedule_once(lambda dt: self._sync(), 0)
 
     def _sync(self, *args):
         r = [dp(14)]
