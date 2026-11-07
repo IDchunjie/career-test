@@ -1,4 +1,4 @@
-﻿[app]
+[app]
 title = 职业测评
 package.name = careertest
 package.domain = org.example
