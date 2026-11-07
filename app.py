@@ -297,6 +297,28 @@ class ThinProgress(BoxLayout):
         self._fill.radius = [dp(3)]
 
 
+class DualBar(BoxLayout):
+    """双色比例条：左侧按比例填充主色，用于 MBTI 维度比例。"""
+
+    def __init__(self, ratio=0.5, height=dp(6), **kwargs):
+        super().__init__(size_hint=(1, None), height=height, **kwargs)
+        self.ratio = max(0.0, min(1.0, ratio))
+        with self.canvas.before:
+            Color(*SOFT)
+            self._track = RoundedRectangle(radius=[dp(3)])
+            Color(*PRIMARY)
+            self._fill = RoundedRectangle(radius=[dp(3)])
+        self.bind(pos=self._sync, size=self._sync)
+
+    def _sync(self, *args):
+        self._track.pos = self.pos
+        self._track.size = self.size
+        self._track.radius = [dp(3)]
+        self._fill.pos = self.pos
+        self._fill.size = (self.width * self.ratio, self.height)
+        self._fill.radius = [dp(3)]
+
+
 class Chip(ButtonBehavior, BoxLayout):
     """1~7 评分小胶囊。"""
 
@@ -509,8 +531,9 @@ class RatingScreen(MDScreen):
 # 霍兰德：结果
 # ---------------------------------------------------------------
 class HollandResultScreen(MDScreen):
-    def __init__(self, app, totals, **kwargs):
+    def __init__(self, app, totals, detail=None, **kwargs):
         super().__init__(**kwargs)
+        self.detail = detail or {}
 
         ranking = sorted(ORDER, key=lambda t: (-totals[t], ORDER.index(t)))
         code = "-".join(ranking[:3])
@@ -543,6 +566,29 @@ class HollandResultScreen(MDScreen):
             scores.add_widget(row)
             scores.add_widget(ThinProgress(totals[t] / 44))
         content.add_widget(scores)
+
+        # 多维度明细：每型在五个部分的得分
+        if self.detail:
+            detail_panel = Panel(pad=(18, 16, 18, 16), spacing=10)
+            detail_panel.add_widget(txt("各维度明细", 15, bold=True))
+            for t in ORDER:
+                row = BoxLayout(
+                    orientation="horizontal", size_hint=(1, None), height=dp(24)
+                )
+                row.add_widget(txt(f"{t} {TYPES[t]['name']}", 13, bold=True))
+                level = "强" if totals[t] >= 30 else ("中" if totals[t] >= 20 else "弱")
+                row.add_widget(
+                    txt(level, 13, bold=True, color=PRIMARY, halign="right")
+                )
+                detail_panel.add_widget(row)
+
+                parts = []
+                for key in ("兴趣", "擅长", "喜欢", "能力", "技能"):
+                    parts.append(f"{key} {self.detail.get(key, {}).get(t, 0)}")
+                detail_panel.add_widget(
+                    txt(" · ".join(parts), 12, color=HINT)
+                )
+            content.add_widget(detail_panel)
 
         for i, t in enumerate(ranking[:3], 1):
             info = TYPES[t]
@@ -675,6 +721,29 @@ class MbtiResultScreen(MDScreen):
             dims.add_widget(row)
         content.add_widget(dims)
 
+        ratio_panel = Panel(pad=(18, 16, 18, 16), spacing=10)
+        ratio_panel.add_widget(txt("维度比例", 15, bold=True))
+        for left, right in DIMENSIONS:
+            total = counts[left] + counts[right]
+            pct = round(100 * counts[left] / total) if total else 50
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None), height=dp(24)
+            )
+            row.add_widget(
+                txt(f"{left} {DIM_NAMES[left]}", 13,
+                    bold=counts[left] >= counts[right])
+            )
+            row.add_widget(
+                txt(f"{pct}% / {100 - pct}%", 12, color=HINT, halign="center")
+            )
+            row.add_widget(
+                txt(f"{DIM_NAMES[right]} {right}", 13, halign="right",
+                    bold=counts[right] > counts[left])
+            )
+            ratio_panel.add_widget(row)
+            ratio_panel.add_widget(DualBar(pct / 100))
+        content.add_widget(ratio_panel)
+
         traits_card = Panel(pad=(18, 16, 18, 16), spacing=8)
         traits_card.add_widget(txt("典型特征", 15, bold=True))
         traits_card.add_widget(txt(traits, 13, color=HINT))
@@ -796,13 +865,12 @@ class SbtiIntroScreen(MDScreen):
         self.add_widget(root)
 
 
-class SbtiTestScreen(MDScreen):
-    def __init__(self, app, **kwargs):
+class SbtiQuestionScreen(MDScreen):
+    """SBTI 一题一屏。"""
+
+    def __init__(self, app, index, total, question, answers, **kwargs):
         super().__init__(**kwargs)
         self.app = app
-        self.answers = {}
-        self.blocks = {}
-        self.extra_added = False
 
         scroll = ScrollView(do_scroll_x=False)
         content = BoxLayout(
@@ -811,59 +879,35 @@ class SbtiTestScreen(MDScreen):
         )
         content.bind(minimum_height=content.setter("height"))
 
-        self.panel = Panel(pad=(18, 18, 18, 18), spacing=10)
-        self.bar = ThinProgress(0)
-        self.panel.add_widget(self.bar)
-        self.count_label = txt("0 / 31", 12, color=HINT, halign="right")
-        self.panel.add_widget(self.count_label)
+        panel = Panel(pad=(18, 18, 18, 18), spacing=12)
+        panel.add_widget(ThinProgress(index / max(1, total)))
+        panel.add_widget(
+            txt(f"第 {index + 1} / {total} 题", 12, color=HINT, halign="right")
+        )
+        panel.add_widget(txt("维度已隐藏", 11, color=HINT))
+        panel.add_widget(txt(question["text"], 19, bold=True))
+        panel.add_widget(spacer(2))
 
-        base = list(SBTI_QUESTIONS) + [SBTI_SPECIAL["drink_gate_q1"]]
-        for q in base:
-            block = SbtiQuestionBlock(q, self._answer)
-            self.blocks[q["id"]] = block
-            self.panel.add_widget(block)
+        current = answers.get(question["id"])
+        for opt in question["options"]:
+            panel.add_widget(
+                OptionRow(
+                    opt["label"],
+                    on_select=lambda v=opt["value"]: self.app.answer_sbti(
+                        question["id"], v),
+                    selected=(current == opt["value"]),
+                )
+            )
 
-        self.hint = txt("", 12, color=PRIMARY, halign="center")
-        self.panel.add_widget(self.hint)
-        self.panel.add_widget(Pill("提交并查看结果", self._submit))
+        if index > 0:
+            panel.add_widget(
+                Pill("上一题", self.app.sbti_back, kind="text",
+                     height=dp(40), font_size=14)
+            )
 
-        content.add_widget(self.panel)
+        content.add_widget(panel)
         scroll.add_widget(content)
         self.add_widget(scroll)
-
-    def _visible_count(self):
-        return 31 + (1 if self.extra_added else 0)
-
-    def _answer(self, qid, value):
-        self.answers[qid] = value
-
-        if qid == "drink_gate_q1" and value == 3 and not self.extra_added:
-            self.extra_added = True
-            q = SBTI_SPECIAL["drink_gate_q2"]
-            block = SbtiQuestionBlock(q, self._answer)
-            self.blocks[q["id"]] = block
-            gate1 = self.blocks["drink_gate_q1"]
-            self.panel.add_widget(block, index=self.panel.children.index(gate1))
-
-        self._update_progress()
-
-    def _update_progress(self):
-        total = self._visible_count()
-        answered = len([k for k in self.answers if k in self.blocks])
-        self.bar.value = min(1.0, answered / total)
-        self.count_label.text = f"{answered} / {total}"
-        if answered >= total:
-            self.hint.text = "全答完了，提交吧"
-        else:
-            self.hint.text = ""
-
-    def _submit(self):
-        total = self._visible_count()
-        missing = total - len([k for k in self.answers if k in self.blocks])
-        if missing > 0:
-            self.hint.text = f"还有 {missing} 题没答"
-            return
-        self.app.show(SbtiResultScreen(self.app, sbti_compute(self.answers)))
 
 
 class SbtiResultScreen(MDScreen):
@@ -1000,6 +1044,9 @@ class CareerApp(MDApp):
         self.holland_index = 0
         self.mbti_counts = None
         self.mbti_index = 0
+        self.sbti_answers = {}
+        self.sbti_extra = False
+        self.sbti_index = 0
 
         Window.bind(on_keyboard=self._on_keyboard)
 
@@ -1116,14 +1163,56 @@ class CareerApp(MDApp):
                    for p in ("兴趣", "擅长", "喜欢", "能力", "技能"))
             for t in ORDER
         }
-        self.show(HollandResultScreen(self, totals))
+        self.show(HollandResultScreen(self, totals, self.holland))
 
     # ---------- SBTI ----------
     def start_sbti(self):
         self.show(SbtiIntroScreen(self))
 
+    def sbti_question_list(self):
+        qs = list(SBTI_QUESTIONS) + [SBTI_SPECIAL["drink_gate_q1"]]
+        if self.sbti_extra:
+            qs.append(SBTI_SPECIAL["drink_gate_q2"])
+        return qs
+
     def start_sbti_test(self):
-        self.show(SbtiTestScreen(self))
+        self.sbti_answers = {}
+        self.sbti_extra = False
+        self.sbti_index = 0
+        self.show_sbti_question()
+
+    def show_sbti_question(self):
+        qs = self.sbti_question_list()
+        idx = min(self.sbti_index, len(qs) - 1)
+        self.show(
+            SbtiQuestionScreen(self, idx, len(qs), qs[idx], self.sbti_answers)
+        )
+
+    def answer_sbti(self, qid, value):
+        self.sbti_answers[qid] = value
+        if qid == "drink_gate_q1" and value == 3:
+            self.sbti_extra = True
+
+        qs = self.sbti_question_list()
+        nxt = self.sbti_index + 1
+        if nxt < len(qs):
+            self.sbti_index = nxt
+            self.show(
+                SbtiQuestionScreen(self, nxt, len(qs), qs[nxt],
+                                   self.sbti_answers)
+            )
+        else:
+            self.show(SbtiResultScreen(self, sbti_compute(self.sbti_answers)))
+
+    def sbti_back(self):
+        if self.sbti_index <= 0:
+            return
+        self.sbti_index -= 1
+        qs = self.sbti_question_list()
+        self.show(
+            SbtiQuestionScreen(self, self.sbti_index, len(qs),
+                               qs[self.sbti_index], self.sbti_answers)
+        )
 
     # ---------- MBTI ----------
     def start_mbti(self):
