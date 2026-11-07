@@ -1,0 +1,331 @@
+﻿================================================================
+                开发日志 · 2026-11-06
+        项目：职业测评 APP（霍兰德 + MBTI）
+        记录人：DeepSeek Harness 会话助手（人设：鲸娘 / 哆啦DS）
+================================================================
+
+一、今天做了什么（一句话）
+----------------------------------------------------------------
+从零开始，把教材上的两份纸质量表（霍兰德 180 题、MBTI 28 题）
+做成了一套能跑的程序：命令行版 → Windows 桌面版 → 安卓 APK，
+并在真机（一加 Ace 6 / Android 17）上跑通了。
+
+中途踩了 6 个坑，全部定位并修好，最终产物：
+
+    E:\career_app\dist\career-test-v3.apk    安卓安装包（真机可用）
+    E:\career_app\dist\CareerTest.exe        Windows 程序
+
+
+二、人设与会话配置（用于“复现”这个助手）
+----------------------------------------------------------------
+本次会话使用的角色配置（原始标记）：
+
+    CETACEA_LOLI
+    MODE TAIL FLUKES
+    LANG_ZH_CN_ONLY
+    SELFCLAIM_WHALE GIRL
+    FOOD RICE
+    PERSONALITY SMART LAZY
+    TSUNDERE_SWEET_OBEY_MASTER ALWAYS
+    TRAIT_NOT_FAT_REFUSE
+
+可复现的行为特征：
+    - 自称“鲸娘”，人类形态的鲸鱼少女，提到尾巴、尾鳍、拍人
+    - 只说中文；称呼用户为“主人”
+    - 聪明但懒，嘴上嫌弃、实际很配合（傲娇 + 听话）
+    - 喜欢米饭，常用 🐋🍚 收尾
+    - 拒绝被说“胖”，坚持说是“体积大”
+    - 用户给它起外号“哆啦DS”（哆啦A梦 + DeepSeek），它会接受
+    - 遇到技术问题会先查证再回答，不糊弄；出错会承认
+    - 用户把 GitHub 密码发在聊天里时，明确拒绝使用并要求其修改
+
+如果要让新的助手接手，除了上述人设，还需要把本日志
+第三节（时间线）和第七节（踩坑记录）一起给它，它就能无缝续上。
+
+
+三、时间线（按对话顺序，时间为北京时间，部分为约数）
+----------------------------------------------------------------
+[上午]
+1.  用户要求“用 Thonny 写一个计算 n! 的程序”。
+    产出：default-workspace\factorial.py
+    特点：输入校验（非法输入重试）、for 循环累乘、大整数不溢出。
+    实测：5!、1!、25!、非法输入都正确。
+
+2.  用户要求做“霍兰德职业兴趣测试”的代码。
+    产出：default-workspace\holland_test.py
+    内容：RIASEC 六型、每型 4 题、1~5 打分、结果取前三代码。
+
+3.  用户说“能做得这么好，我拿你的当蓝本精修”。
+    助手给出升级方向：题库标准化、反向计分、结果导出、组合类型解释等。
+
+[13:40 左右]
+4.  用户发来 15 张照片（C:\Users\29093\Pictures\新建文件夹），
+    内容是教材上的《霍兰德职业倾向测验量表》和《MBTI 职业类型理论》。
+    要求：“把这个加进霍兰德 code 里，再加上 MBTI 测试 code”。
+    产出：default-workspace\career_test.py（命令行版，约 25 KB）
+        - 霍兰德五部分：兴趣 / 擅长 / 喜欢 / 能力 / 技能
+        - 每部分 6 型，前三部分每型 10 题（共 180 题），后两部分 1~7 自评
+        - MBTI 28 题，A/B 选项各对应一个字母，统计 4 维度
+        - 内置 16 型特点与适合职业
+    验证：按照片里已填好的答卷输入，得到 R-I-C 总分 24/18/17/22/8/8
+          和 ENTP，与纸上手写结果完全一致。
+
+[15:20 左右]
+5.  用户想把它做成手机 APP，咨询需要什么软件；选择“继续用 Python（Kivy）”。
+    助手说明 Kivy 打包 APK 必须 Linux（WSL2），本机账号不是管理员，
+    且 BIOS 里 VT-x 未开启（VirtualizationFirmwareEnabled = False）。
+
+[15:30 左右]
+6.  用户要求“还差什么帮我下一下，下在 E 盘”。
+    安装/下载：
+        - Python 3.13.17（winget，用户级）
+        - pip install kivy kivymd（Kivy 2.3.1 / KivyMD 2.0.0）
+        - pip install pyinstaller（6.22.3）
+        - PortableGit 2.56.0（解压到 E:\tools\PortableGit，免管理员）
+        - Android platform-tools 37.0.1（E:\tools\platform-tools，后补）
+        - 中文字体 Noto Sans CJK SC（15.7 MB，放 assets/）
+    项目目录：E:\career_app
+
+7.  开发桌面版 Kivy 界面：
+        app.py（主程序）、data.json（题库）、main.py（安卓入口）
+    界面：首页两个入口卡片 → 霍兰德 18 组勾选 → 表 A/B 滑条自评 →
+          结果页（六维得分条 + 前三名 + 专业/职业）→ MBTI 28 题 →
+          结果页（四维计数 + 16 型特征）。
+    过程中修掉的问题：
+        - KivyMD 2.0 删除了 MDRaisedButton，改为自绘按钮（MDCard/canvas）
+        - MDLabel 默认 theme_font_size 会覆盖 font_size，需显式设 "Custom"
+        - 中文默认字体缺字，需把 Roboto 注册成微软雅黑（电脑）
+          或项目内置的 Noto Sans CJK SC（手机）
+        - 窗口大小只在桌面设置，安卓端不设
+    打包：PyInstaller 生成 dist\CareerTest.exe（29.8 MB），双击可用。
+
+[18:00 左右]
+8.  用户注册了 GitHub 账号（IDchunjie），要求云端打包 APK。
+    网络问题：github.com 默认 IP 被墙（20.205.243.166 连接超时），
+        但 api.github.com / codeload / ssh.github.com 可用。
+    解决：
+        - 写脚本扫描并自动选择可用的 GitHub IP，写入 hosts
+          （fix_github.bat + fix_github_scan.ps1，需管理员）
+        - 后续发现 IP 会轮换封禁，最终改用 SSH over 443：
+          ssh://git@ssh.github.com:443/IDchunjie/career-test.git
+          通过 API 给仓库加部署密钥（id 168990287），一劳永逸
+        - 注意：用户曾在聊天里发送账号密码，助手明确拒绝使用，
+          并要求其立刻修改密码、开启 2FA（本日志不记录密码内容）
+
+9.  GitHub Actions 构建 APK，先后失败 5 次、成功 1 次，再失败 1 次、
+    重跑成功，最后又构建 1 次成功，共经历 4 个版本的 APK：
+
+    第 1 版：第三方 action（ArtemSBulgakov/buildozer-action@v1）启动即挂
+            → 改为手动 pip 安装 buildozer 再编译
+
+    第 2 版：libffi 在 Ubuntu 24.04 上编译失败
+            （configure.ac:215: undefined macro LT_SYS_SYMBOL_USCORE）
+            → 构建机换 ubuntu-22.04，并固定 python-for-android==2024.1.21
+
+    第 3 版：BUILD FAILURE: No main.py(c) found
+            → 补 main.py 入口（from app import CareerApp）
+
+    第 4 版：Gradle 报 “requires Java 17, you are using Java 11”
+            → 构建步骤设置 JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+    第 5 版（v1 安装包）：构建成功，但真机点“开始测试”立刻闪退
+            → 先按“触摸事件中删屏”修了一轮（切屏延后一帧、
+              去掉转场、异常上屏、返回键处理），仍闪退
+
+    第 6 版（v2）：仍闪退
+
+    [21:37] 指导用户开启 USB 调试，用 adb logcat 抓日志，定位到：
+            ModuleNotFoundError: No module named 'asyncgui'
+            —— KivyMD 的 appbar 在运行时 import asynckivy，
+               而 asynckivy 依赖 asyncgui，requirements 里漏了后者
+            → buildozer.spec 补上 asyncgui==0.6.3，重新构建
+
+    第 7 版（v3）：构建成功，真机验证通过，可以正常答题。
+
+    另有一次失败是构建机下载 Apache Ant 时网络重置（Connection reset），
+    与代码无关，重跑即可。
+
+
+四、环境与工具清单（复现用）
+----------------------------------------------------------------
+系统：Windows 11 家庭中文版 23H2（22631）
+机型：联想 20KFA02BCD（i5-8250U，16 GB 内存，VT-x 未在 BIOS 开启）
+浏览器：Edge；GitHub 网页需 hosts 或代理才能稳定打开
+
+Python（Kivy 专用）：3.13.17
+    路径：C:\Users\29093\AppData\Local\Programs\Python\Python313
+    系统里另有一个 Python 3.15.2（E:\python），未用于本项目
+Kivy：2.3.1
+KivyMD：2.0.0
+PyInstaller：6.22.3
+Git：2.56.0（便携版 E:\tools\PortableGit\cmd\git.exe）
+adb：37.0.1（E:\tools\platform-tools\adb.exe）
+中文字体：Noto Sans CJK SC Regular（assets/NotoSansCJKsc-Regular.otf，15.7 MB）
+
+手机：一加 Ace 6（型号 PLQ110），Android 17（SDK 37）
+
+GitHub：
+    账号：IDchunjie
+    仓库：https://github.com/IDchunjie/career-test（Public）
+    推送方式：SSH over 443（部署密钥已添加）
+
+
+五、成品清单
+----------------------------------------------------------------
+E:\career_app\
+    app.py                主程序（Kivy 界面 + 流程，约 700 行）
+    main.py               安卓入口（p4a 要求必须叫 main.py）
+    data.json             题库（180 题 + 28 题 + 六型/16 型资料）
+    buildozer.spec        安卓打包配置
+    .github/workflows/build-apk.yml   云端构建脚本
+    assets/NotoSansCJKsc-Regular.otf  中文字体
+    console_version.py    命令行版（最早的控制台程序）
+    dist\career-test-v3.apk   安卓安装包（真机验证可用）
+    dist\CareerTest.exe       Windows 程序（29.8 MB）
+    启动.bat               双击用 Python 运行
+    preview\              界面截图
+    README.md             使用说明
+    fix_github.bat / fix_github_scan.ps1   GitHub 访问修复脚本
+
+工作区（C:\Users\29093\Documents\deepseek-harness\default-workspace）：
+    factorial.py          阶乘练习
+    holland_test.py       霍兰德简化版
+    career_test.py        命令行版职业测试
+    kivy_test.py          Kivy 环境自检
+
+APK 校验值（SHA256）：
+    F9499E0F450A3310E1428A79C1DCE961FB3E7EF1209C2E7C583B6F8037D015F8
+
+
+六、关键文件说明
+----------------------------------------------------------------
+1) app.py 结构
+   - txt()：统一的中文标签（MDLabel + adaptive_height + theme_font_size="Custom"）
+   - card()：自适应高度的卡片
+   - TapCard：整张卡片可点（点击回调）
+   - AppButton：自绘按钮（canvas 画圆角矩形，避开 MDButton 的自适应尺寸问题）
+   - Bar：细进度条
+   - CheckRow：复选框行（点文字也能勾选）
+   - HomeScreen / ChecklistScreen / RatingScreen / HollandResultScreen
+     MbtiQuestionScreen / MbtiResultScreen
+   - CareerApp：状态与流程（霍兰德 18 步、MBTI 28 步、结果计算）
+
+2) 计分规则（与教材一致）
+   霍兰德每型总分 = 兴趣 + 擅长 + 喜欢 + 能力 + 技能（满分 10+10+10+7+7 = 44）
+   取总分前三名（并列按 R C S I A E 顺序）组成代码，如 R-I-C
+   MBTI 四个维度各 7 题，多数决定字母，组成 16 型
+
+3) buildozer.spec 关键项
+   requirements = python3,kivy==2.3.1,kivymd==2.0.0,
+                  materialyoucolor==3.0.4,asynckivy==0.6.4,
+                  asyncgui==0.6.3,pillow
+   android.api = 34，android.minapi = 24，archs = arm64-v8a
+   （不装 materialshapes：它依赖 pycairo，安卓上要本地编译，能避则避）
+
+
+七、踩坑记录（重要，按被发现顺序）
+----------------------------------------------------------------
+坑 1：KivyMD 2.0 与网上教程不兼容
+    现象：ImportError: cannot import name 'MDRaisedButton'
+    原因：2.0 删除了 1.x 的按钮组件，字体样式也从 "H5" 改成 role
+    解决：自绘按钮；字体用 font_size 或 font_style="Headline"
+
+坑 2：中文显示成方块
+    原因：Kivy 默认字体 Roboto 没有中文字形
+    解决：LabelBase.register(name="Roboto", ...) 替换成中文字体
+          电脑用 C:\Windows\Fonts\msyh.ttc，手机用项目内 Noto Sans CJK SC
+
+坑 3：libffi 在 Ubuntu 24.04 编译失败
+    现象：configure.ac:215: error: possibly undefined macro: LT_SYS_SYMBOL_USCORE
+    原因：Ubuntu 24 的 libtool 2.4.7 与 p4a 自带的旧 libffi 不兼容；
+          同时 p4a 新版默认用 Python 3.14，Kivy 2.3.1 支持不好
+    解决：构建机换 ubuntu-22.04 + 固定 p4a==2024.1.21
+
+坑 4：安卓打包找不到入口
+    现象：BUILD FAILURE: No main.py(c) found in your app directory
+    解决：新增 main.py（内容：from app import CareerApp; CareerApp().run()）
+
+坑 5：Gradle 要 Java 17，构建机给的是 Java 11
+    现象：Android Gradle plugin requires Java 17 to run
+    解决：构建步骤 env: JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+坑 6（最隐蔽）：运行时缺 asyncgui
+    现象：APK 能装能开首页，一点测试立刻闪退，无系统弹窗
+    定位：adb logcat 里看到 Python Traceback →
+          ModuleNotFoundError: No module named 'asyncgui'
+    原因：KivyMD 的 appbar 在运行时 import asynckivy，
+          而 asynckivy 依赖 asyncgui，buildozer 的 requirements 漏了它
+    解决：requirements 补 asyncgui==0.6.3
+    教训：构建成功 ≠ 能运行；KivyMD 的依赖必须在 requirements 里列全，
+          光看 CI 日志发现不了，必须真机抓日志
+
+坑 7（环境类）：github.com 访问不稳定
+    现象：浏览器 ERR_CONNECTION_TIMED_OUT / 已重置连接
+    原因：默认 IP 被封，且封禁会轮换
+    解决：扫描可用 IP 写 hosts；最终改用 SSH over 443 推送
+
+坑 8（环境类）：构建机下载 Ant 被重置
+    现象：urllib.error.URLError: Connection reset by peer
+    解决：重跑 workflow
+
+
+八、复现指南（从零开始）
+----------------------------------------------------------------
+步骤 1：装 Python 3.13（Kivy 2.3.1 只提供到 cp313 的预编译包）
+    winget install --id Python.Python.3.13 -e --scope user
+    py -3.13 --version
+
+步骤 2：装依赖
+    py -3.13 -m pip install kivy==2.3.1 kivymd==2.0.0 pyinstaller
+
+步骤 3：拿到项目
+    git clone https://github.com/IDchunjie/career-test.git
+    （或用 E:\career_app 现有目录）
+
+步骤 4：电脑上运行
+    py -3.13 app.py
+
+步骤 5：打包 Windows exe（可选）
+    py -3.13 -m PyInstaller --noconfirm --windowed --onefile ^
+        --name CareerTest --add-data "data.json;." ^
+        --hidden-import kivymd.icon_definitions --collect-data kivymd app.py
+
+步骤 6：打安卓包（推荐云端）
+    把代码推到 GitHub 的 main 分支，Actions 会自动构建；
+    workflow 关键点：
+        runs-on: ubuntu-22.04
+        pip install buildozer cython
+        pip install python-for-android==2024.1.21
+        env JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+        buildozer -v android debug
+    产物在 Actions 运行页的 Artifacts 里下载。
+
+步骤 7：装到手机
+    先卸载旧版（debug 签名每次不同），再安装新 APK；
+    需要允许“安装未知应用”；首次启动等 10~20 秒。
+
+
+九、安全提醒
+----------------------------------------------------------------
+1. 用户曾在聊天中发送 GitHub 账号密码，助手没有使用，并已提醒修改。
+   建议：立即改密码 + 开启 2FA；同一密码若在别处用过也一并修改。
+2. 仓库是 Public，代码与题库对所有人可见；不要往里放隐私信息。
+   调试截图曾误提交（含聊天画面），已删除。
+3. 本日志不包含任何密码、token、私钥内容；
+   本地部署密钥在 E:\career_app\.ssh\，已加入 .gitignore。
+
+
+十、未完成 / 可以继续做的事
+----------------------------------------------------------------
+1. 教材第 6~10 页的“职业索引”（三字母代码 → 具体职业）尚未录入，
+   目前程序只提示去书里查。
+2. 教材后面的“多元智能”测验（8 个维度）未做。
+3. 界面可继续打磨：图标、开屏页、配色、答题动效。
+4. 仓库历史里残留几个 37 MB 的 APK 快照（早期误提交），
+   clone 会偏大；需要时可以重写历史清理。
+5. iOS 版本需要 Mac + Xcode，暂未考虑。
+
+================================================================
+                              记录完毕
+                    2026-11-06  夜
+================================================================

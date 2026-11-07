@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-职业测评 APP
-霍兰德职业倾向测验（教材原版 180 题）+ MBTI 职业性格测试（28 题）
-
-运行：
-    py -3.13 app.py
+职业测评 APP（Kivy + KivyMD）
+视觉风格：薄荷白背景 + 白色大圆角卡片 + 墨绿主色 + 细描边
+参考：B 站 SBTI 玩具的浅色极简风格
 """
 
 import json
@@ -14,24 +12,19 @@ import traceback
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.core.window import Window
-from kivy.graphics import Color, Line, RoundedRectangle
+from kivy.graphics import Color, Ellipse, Line, RoundedRectangle
 from kivy.metrics import dp
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.progressbar import ProgressBar
 from kivy.uix.screenmanager import NoTransition
 from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
 
 from kivymd.app import MDApp
-from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDButton, MDButtonText
-from kivymd.uix.card import MDCard
 from kivymd.uix.label import MDLabel
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.screenmanager import MDScreenManager
-from kivymd.uix.selectioncontrol import MDCheckbox
-from kivymd.uix.slider import MDSlider
 
 # ---------------------------------------------------------------
 # 基础设置
@@ -51,31 +44,44 @@ MBTI_TYPES = DATA["mbti_types"]
 DIMENSIONS = DATA["dimensions"]
 DIM_NAMES = DATA["dim_names"]
 
-# 中文界面必须换成带中文字形的字体，否则全是方块。
-# 优先用项目自带的 Noto Sans SC（打包进 APK 时用），电脑上再退回系统字体。
+# SBTI 数据（题目 / 15 维度 / 25 种人格 / 解释）
+with open(os.path.join(BASE_DIR, "sbti_data.json"), encoding="utf-8") as f:
+    SBTI = json.load(f)
+
+SBTI_DIMS = SBTI["dims"]
+SBTI_DIM_META = SBTI["dimMeta"]
+SBTI_QUESTIONS = SBTI["questions"]
+SBTI_SPECIAL = SBTI["special"]
+SBTI_TYPES = SBTI["types"]
+SBTI_EXPL = SBTI["explanations"]
+SBTI_LEVEL = {"L": 1, "M": 2, "H": 3}
+
 FONT_CANDIDATES = [
     os.path.join(BASE_DIR, "assets", "NotoSansCJKsc-Regular.otf"),
     r"C:\Windows\Fonts\msyh.ttc",
     r"C:\Windows\Fonts\simhei.ttf",
 ]
-
-for font in FONT_CANDIDATES:
-    if os.path.exists(font):
-        LabelBase.register(
-            name="Roboto",
-            fn_regular=font,
-            fn_bold=font,
-        )
+for _f in FONT_CANDIDATES:
+    if os.path.exists(_f):
+        LabelBase.register(name="Roboto", fn_regular=_f, fn_bold=_f)
         break
 
-TEXT = (0.12, 0.14, 0.17, 1)
-HINT = (0.42, 0.45, 0.50, 1)
-TEAL = (0.0, 0.59, 0.53, 1)
-BG = (0.965, 0.973, 0.980, 1)
+# 色板（取自 SBTI 页面 computed style）
+BG = (0.965, 0.984, 0.973, 1)             # #F6FBF8 背景
+CARD = (1, 1, 1, 1)                       # 卡片
+BORDER = (0.859, 0.910, 0.867, 1)         # #DBE8DD 卡片描边
+TEXT = (0.118, 0.165, 0.133, 1)           # #1E2A22 主文字
+HINT = (0.416, 0.471, 0.435, 1)           # #6A786F 次要文字
+PRIMARY = (0.302, 0.416, 0.325, 1)        # #4D6A53 墨绿
+SOFT = (0.906, 0.945, 0.918, 1)           # #E7F1EA 浅绿底
+OPTION_BG = (0.973, 0.988, 0.976, 1)      # #F8FCF9 选项底
+OPTION_BORDER = (0.737, 0.816, 0.757, 1)  # #BCD0C1 选项描边
+TRACK = (0.929, 0.953, 0.933, 1)          # #EDF3EE 进度轨道
+WHITE = (1, 1, 1, 1)
 
 
 def txt(text, size=15, color=TEXT, bold=False, halign="left"):
-    """自动换行、自动撑高的中文标签（用 KivyMD 自带的自适应高度）。"""
+    """自适应高度的中文标签。"""
     return MDLabel(
         text=text,
         font_size=f"{size}sp",
@@ -90,140 +96,264 @@ def txt(text, size=15, color=TEXT, bold=False, halign="left"):
     )
 
 
-def card(**kwargs):
-    """统一样式的卡片容器（高度跟着内容走）。"""
-    kwargs.setdefault("orientation", "vertical")
-    kwargs.setdefault("padding", [dp(16), dp(12), dp(16), dp(12)])
-    kwargs.setdefault("spacing", dp(4))
-    kwargs.setdefault("size_hint", (1, None))
-    kwargs.setdefault("radius", [dp(14)])
-    kwargs.setdefault("style", "elevated")
-    c = MDCard(**kwargs)
-    c.bind(minimum_height=c.setter("height"))
-    return c
+def spacer(h=8):
+    return Label(size_hint_y=None, height=dp(h))
 
 
-class TapCard(MDCard):
-    """整张卡片都能点的卡片。"""
+class Panel(BoxLayout):
+    """白色大圆角卡片：细描边 + 柔和阴影。"""
 
-    def __init__(self, on_tap=None, **kwargs):
-        super().__init__(**kwargs)
-        self._on_tap = on_tap
+    RADIUS = 22
 
-    def on_touch_down(self, touch):
-        if self._on_tap and self.collide_point(*touch.pos):
-            self._on_tap()
-            return True
-        return super().on_touch_down(touch)
-
-
-class Bar(ProgressBar):
-    """细一点的进度条。"""
-
-    def __init__(self, value=0.0, **kwargs):
-        super().__init__(
-            max=100, value=value, size_hint=(1, None), height=dp(8), **kwargs
-        )
-
-
-class AppButton(BoxLayout):
-    """自绘按钮：KivyMD 2.0 的 MDButton 会按内容自适应，干脆自己画一个。"""
-
-    def __init__(self, text, on_tap, filled=True, height=None, text_size=15):
+    def __init__(self, pad=(16, 16, 16, 16), spacing=10, **kwargs):
         super().__init__(
             orientation="vertical",
             size_hint=(1, None),
-            height=height if height is not None else dp(46),
-            padding=[dp(8), 0, dp(8), 0],
+            padding=[dp(pad[0]), dp(pad[1]), dp(pad[2]), dp(pad[3])],
+            spacing=dp(spacing),
+            **kwargs,
         )
-        self._on_tap = on_tap
 
         with self.canvas.before:
-            Color(*(TEAL if filled else (1, 1, 1, 1)))
-            self._bg = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(12)])
-            if not filled:
-                Color(*TEAL)
-                self._line = Line(
-                    rounded_rectangle=(self.x, self.y, self.width, self.height, dp(12)),
-                    width=1.2,
-                )
+            Color(0.18, 0.29, 0.22, 0.06)
+            self._shadow = RoundedRectangle(radius=[dp(self.RADIUS)])
+            Color(*CARD)
+            self._fill = RoundedRectangle(radius=[dp(self.RADIUS)])
+            Color(*BORDER)
+            self._line = Line(width=1)
+
+        self.bind(pos=self._sync, size=self._sync)
+        self.bind(minimum_height=self.setter("height"))
+
+    def _sync(self, *args):
+        r = [dp(self.RADIUS)]
+        self._shadow.pos = (self.x, self.y - dp(5))
+        self._shadow.size = self.size
+        self._shadow.radius = r
+        self._fill.pos = self.pos
+        self._fill.size = self.size
+        self._fill.radius = r
+        self._line.rounded_rectangle = (
+            self.x, self.y, self.width, self.height, dp(self.RADIUS)
+        )
+
+
+class Pill(ButtonBehavior, BoxLayout):
+    """圆角按钮：filled 墨绿 / outline 白底描边 / text 纯文字。"""
+
+    def __init__(self, label, on_press=None, kind="filled", height=dp(48),
+                 font_size=16, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            size_hint=(1, None),
+            height=height,
+            padding=[dp(8), 0, dp(8), 0],
+            **kwargs,
+        )
+        self.kind = kind
+        self._on_press = on_press
+
+        if kind == "filled":
+            fill_color, line_color, text_color = PRIMARY, PRIMARY, WHITE
+        elif kind == "outline":
+            fill_color, line_color, text_color = WHITE, OPTION_BORDER, PRIMARY
+        else:
+            fill_color, line_color, text_color = (1, 1, 1, 0), (1, 1, 1, 0), PRIMARY
+
+        with self.canvas.before:
+            Color(*fill_color)
+            self._bg = RoundedRectangle(radius=[dp(14)])
+            if kind != "text":
+                Color(*line_color)
+                self._border = Line(width=1)
+            else:
+                self._border = None
 
         self.bind(pos=self._sync, size=self._sync)
         self.add_widget(
             MDLabel(
-                text=text,
-                font_size=f"{text_size}sp",
+                text=label,
+                font_size=f"{font_size}sp",
                 theme_font_size="Custom",
+                theme_text_color="Custom",
+                text_color=text_color,
                 bold=True,
                 halign="center",
                 valign="middle",
-                theme_text_color="Custom",
-                text_color=(1, 1, 1, 1) if filled else TEAL,
             )
         )
 
     def _sync(self, *args):
         self._bg.pos = self.pos
         self._bg.size = self.size
-        if hasattr(self, "_line"):
-            self._line.rounded_rectangle = (
-                self.x, self.y, self.width, self.height, dp(12)
+        self._bg.radius = [dp(14)]
+        if self._border is not None:
+            self._border.rounded_rectangle = (
+                self.x, self.y, self.width, self.height, dp(14)
             )
 
-    def on_touch_down(self, touch):
-        if self._on_tap and self.collide_point(*touch.pos):
-            self._on_tap()
-            return True
-        return super().on_touch_down(touch)
+    def on_release(self):
+        if self._on_press:
+            self._on_press()
 
 
-def action_button(text, callback, style="filled", height=None):
-    """全宽按钮。"""
-    return AppButton(
-        text, callback, filled=(style == "filled"), height=height
-    )
+class OptionRow(ButtonBehavior, BoxLayout):
+    """选项行：圆形选择点 + 文字，整行可点。"""
 
+    PAD_V = 14
+    MIN_H = 52
 
-class CheckRow(MDBoxLayout):
-    """一行「复选框 + 文字」，点哪都能勾选。"""
-
-    def __init__(self, text, on_change=None, **kwargs):
+    def __init__(self, text, on_select=None, selected=False, letter=None,
+                 **kwargs):
         super().__init__(
             orientation="horizontal",
             size_hint=(1, None),
-            height=dp(44),
-            spacing=dp(4),
+            height=dp(self.MIN_H),
+            padding=[dp(44), dp(10), dp(16), dp(10)],
+            spacing=dp(10),
             **kwargs,
         )
-        self.on_change = on_change
+        self._on_select = on_select
+        self.selected = selected
+        self.letter = letter
 
-        self.checkbox = MDCheckbox(
-            active=False, size_hint=(None, None), size=(dp(40), dp(40)),
-            pos_hint={"center_y": 0.5},
-        )
-        self.checkbox.bind(active=self._changed)
+        with self.canvas.before:
+            Color(*(SOFT if selected else OPTION_BG))
+            self._bg = RoundedRectangle(radius=[dp(14)])
+            Color(*(PRIMARY if selected else OPTION_BORDER))
+            self._border = Line(width=1)
+            Color(*(PRIMARY if selected else OPTION_BORDER))
+            self._ring = Line(width=1.4)
+            Color(*(PRIMARY if selected else (1, 1, 1, 0)))
+            self._dot = Ellipse()
 
-        self.label = txt(text, 14)
-        self.label.pos_hint = {"center_y": 0.5}
-        self.label.bind(height=self._relayout)
+        self.bind(pos=self._sync, size=self._sync)
 
-        self.add_widget(self.checkbox)
-        self.add_widget(self.label)
+        label_text = f"{letter}. {text}" if letter else text
+        self._label = txt(label_text, 15, color=TEXT)
+        self._label.bind(height=self._relayout)
+        self.add_widget(self._label)
 
-    def _changed(self, checkbox, value):
-        if self.on_change:
-            self.on_change(value)
+        self._relayout()
 
     def _relayout(self, *args):
-        self.height = max(dp(44), self.label.height + dp(10))
+        self.height = max(dp(self.MIN_H), self._label.height + dp(20))
 
-    def on_touch_down(self, touch):
-        if self.collide_point(*touch.pos):
-            # 点文字也能切换复选框
-            if not self.checkbox.collide_point(*touch.pos):
-                self.checkbox.active = not self.checkbox.active
-                return True
-        return super().on_touch_down(touch)
+    def _sync(self, *args):
+        r = [dp(14)]
+        self._bg.pos = self.pos
+        self._bg.size = self.size
+        self._bg.radius = r
+        self._border.rounded_rectangle = (
+            self.x, self.y, self.width, self.height, dp(14)
+        )
+
+        cx = self.x + dp(24)
+        cy = self.center_y
+        rad = dp(8)
+        self._ring.circle = (cx, cy, rad)
+        self._dot.pos = (cx - rad / 2, cy - rad / 2)
+        self._dot.size = (rad, rad)
+
+    def set_selected(self, value):
+        self.selected = value
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(*(SOFT if value else OPTION_BG))
+            self._bg = RoundedRectangle(radius=[dp(14)], pos=self.pos, size=self.size)
+            Color(*(PRIMARY if value else OPTION_BORDER))
+            self._border = Line(width=1)
+            Color(*(PRIMARY if value else OPTION_BORDER))
+            self._ring = Line(width=1.4)
+            Color(*(PRIMARY if value else (1, 1, 1, 0)))
+            self._dot = Ellipse()
+        self._sync()
+
+    def on_release(self):
+        if self._on_select:
+            self._on_select()
+
+
+class ThinProgress(BoxLayout):
+    """细进度条。"""
+
+    def __init__(self, value=0.0, height=dp(6), **kwargs):
+        super().__init__(size_hint=(1, None), height=height, **kwargs)
+        self.value = max(0.0, min(1.0, value))
+        with self.canvas.before:
+            Color(*TRACK)
+            self._track = RoundedRectangle(radius=[dp(3)])
+            Color(*PRIMARY)
+            self._fill = RoundedRectangle(radius=[dp(3)])
+        self.bind(pos=self._sync, size=self._sync)
+
+    def _sync(self, *args):
+        self._track.pos = self.pos
+        self._track.size = self.size
+        self._track.radius = [dp(3)]
+        w = max(0, self.width * self.value)
+        self._fill.pos = self.pos
+        self._fill.size = (w, self.height)
+        self._fill.radius = [dp(3)]
+
+
+class Chip(ButtonBehavior, BoxLayout):
+    """1~7 评分小胶囊。"""
+
+    def __init__(self, number, on_select=None, selected=False, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            size_hint=(1, None),
+            height=dp(40),
+            padding=[0, 0, 0, 0],
+            **kwargs,
+        )
+        self.number = number
+        self._on_select = on_select
+        self.selected = selected
+
+        with self.canvas.before:
+            Color(*(PRIMARY if selected else OPTION_BG))
+            self._bg = RoundedRectangle(radius=[dp(12)])
+            Color(*(PRIMARY if selected else OPTION_BORDER))
+            self._border = Line(width=1)
+
+        self.bind(pos=self._sync, size=self._sync)
+        self._label = MDLabel(
+            text=str(number),
+            font_size="14sp",
+            theme_font_size="Custom",
+            theme_text_color="Custom",
+            text_color=(WHITE if selected else TEXT),
+            bold=selected,
+            halign="center",
+            valign="middle",
+        )
+        self.add_widget(self._label)
+
+    def _sync(self, *args):
+        self._bg.pos = self.pos
+        self._bg.size = self.size
+        self._bg.radius = [dp(12)]
+        self._border.rounded_rectangle = (
+            self.x, self.y, self.width, self.height, dp(12)
+        )
+
+    def set_selected(self, value):
+        self.selected = value
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(*(PRIMARY if value else OPTION_BG))
+            self._bg = RoundedRectangle(radius=[dp(12)], pos=self.pos, size=self.size)
+            Color(*(PRIMARY if value else OPTION_BORDER))
+            self._border = Line(width=1)
+        self._label.text_color = WHITE if value else TEXT
+        self._label.bold = value
+        self._sync()
+
+    def on_release(self):
+        if self._on_select:
+            self._on_select(self.number)
 
 
 # ---------------------------------------------------------------
@@ -232,36 +362,27 @@ class CheckRow(MDBoxLayout):
 class HomeScreen(MDScreen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
-        self.app = app
 
-        root = MDBoxLayout(
+        root = BoxLayout(
             orientation="vertical",
-            padding=[dp(18), dp(26), dp(18), dp(18)],
-            spacing=dp(10),
+            padding=[dp(18), dp(24), dp(18), dp(18)],
         )
 
-        root.add_widget(txt("职业测评", 30, bold=True, halign="center"))
-        root.add_widget(
-            txt("霍兰德职业倾向测验 + MBTI 性格测试", 13, color=HINT, halign="center")
+        hero = Panel(pad=(22, 26, 22, 22), spacing=14)
+        hero.add_widget(txt("职业测评", 32, bold=True, halign="center"))
+        hero.add_widget(
+            txt("霍兰德 · MBTI · SBTI 三个测试", 13, color=HINT, halign="center")
         )
-        root.add_widget(Label(size_hint_y=None, height=dp(14)))
-
-        root.add_widget(
-            self.entry(
-                "霍兰德职业倾向测验",
-                "180 题 · 找到你的兴趣类型",
-                lambda: self.app.start_holland(),
-            )
-        )
-        root.add_widget(
-            self.entry(
-                "MBTI 职业性格测试",
-                "28 题 · 看看你是哪一型",
-                lambda: self.app.start_mbti(),
-            )
+        hero.add_widget(spacer(6))
+        hero.add_widget(Pill("霍兰德职业倾向测验", app.start_holland))
+        hero.add_widget(Pill("MBTI 职业性格测试", app.start_mbti, kind="outline"))
+        hero.add_widget(Pill("SBTI 人格测试", app.start_sbti, kind="outline"))
+        hero.add_widget(
+            txt("在手机上完成约需 10 分钟", 12, color=HINT, halign="center")
         )
 
-        root.add_widget(Label())  # 占位，把内容顶到上面
+        root.add_widget(hero)
+        root.add_widget(Label())
 
         root.add_widget(
             txt("结果仅供参考，不做专业或职业选择的唯一依据",
@@ -269,24 +390,9 @@ class HomeScreen(MDScreen):
         )
         self.add_widget(root)
 
-    def entry(self, title, subtitle, callback):
-        c = TapCard(
-            on_tap=callback,
-            orientation="vertical",
-            padding=[dp(16), dp(12), dp(16), dp(10)],
-            spacing=dp(2),
-            size_hint=(1, None),
-            height=dp(78),
-            radius=[dp(14)],
-            style="elevated",
-        )
-        c.add_widget(txt(title, 17, bold=True))
-        c.add_widget(txt(subtitle, 12, color=HINT))
-        return c
-
 
 # ---------------------------------------------------------------
-# 霍兰德：勾选一组题
+# 霍兰德：勾选一组
 # ---------------------------------------------------------------
 class ChecklistScreen(MDScreen):
     def __init__(self, app, part, type_key, step, total, **kwargs):
@@ -297,51 +403,51 @@ class ChecklistScreen(MDScreen):
         self.step = step
         self.total = total
         self.checked = set()
+        self.rows = {}
 
-        root = MDBoxLayout(
-            orientation="vertical",
-            padding=[dp(16), dp(14), dp(16), dp(14)],
-            spacing=dp(8),
-        )
-
-        # 顶部：进度
-        root.add_widget(txt(f"第 {step + 1} / {total} 组", 11, color=HINT, halign="right"))
-        root.add_widget(Bar(step / total * 100))
-
-        # 标题
-        info = TYPES[type_key]
-        root.add_widget(txt(part["name"], 12, color=HINT))
-        root.add_widget(txt(f"{type_key} {info['name']}", 20, bold=True))
-        root.add_widget(txt("选上你符合的项，可以多选，也可以一个都不选", 12, color=HINT))
-
-        # 题目列表
         scroll = ScrollView(do_scroll_x=False)
-        box = MDBoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(2))
-        box.bind(minimum_height=box.setter("height"))
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        panel = Panel(pad=(18, 18, 18, 18), spacing=12)
+        panel.add_widget(ThinProgress(step / total))
+        panel.add_widget(
+            txt(f"第 {step + 1} / {total} 组", 12, color=HINT, halign="right")
+        )
+        panel.add_widget(txt(part["name"], 12, color=HINT))
+        panel.add_widget(txt(f"{type_key} {TYPES[type_key]['name']}", 22, bold=True))
+        panel.add_widget(
+            txt("选上你符合的项，可以多选，也可以一个都不选", 12, color=HINT)
+        )
 
         for i, item in enumerate(part["items"][type_key], 1):
-            row = CheckRow(
+            row = OptionRow(
                 f"{i}. {item}",
-                on_change=lambda active, idx=i: self._toggle(idx, active),
+                on_select=lambda idx=i: self._toggle(idx),
             )
-            row.ids_no = i
-            box.add_widget(row)
-        scroll.add_widget(box)
-        root.add_widget(scroll)
+            self.rows[i] = row
+            panel.add_widget(row)
 
-        # 底部按钮
-        root.add_widget(
-            action_button(
-                "下一组" if step + 1 < total else "进入下一步", self._next
-            )
+        panel.add_widget(spacer(4))
+        panel.add_widget(
+            Pill("下一组" if step + 1 < total else "进入下一步", self._next)
         )
-        self.add_widget(root)
 
-    def _toggle(self, idx, active):
-        if active:
-            self.checked.add(idx)
-        else:
+        content.add_widget(panel)
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+    def _toggle(self, idx):
+        row = self.rows[idx]
+        if idx in self.checked:
             self.checked.discard(idx)
+            row.set_selected(False)
+        else:
+            self.checked.add(idx)
+            row.set_selected(True)
 
     def _next(self):
         self.app.submit_checklist(self.part["key"], self.type_key, len(self.checked))
@@ -356,57 +462,47 @@ class RatingScreen(MDScreen):
         self.app = app
         self.on_done = on_done
         self.values = {t: 4 for t in ORDER}
-
-        root = MDBoxLayout(
-            orientation="vertical",
-            padding=[dp(16), dp(14), dp(16), dp(14)],
-            spacing=dp(8),
-        )
-        root.add_widget(txt(title, 22, bold=True))
-        root.add_widget(txt(desc, 12, color=HINT))
+        self.chips = {}
 
         scroll = ScrollView(do_scroll_x=False)
-        box = MDBoxLayout(orientation="vertical", size_hint_y=None, spacing=dp(6))
-        box.bind(minimum_height=box.setter("height"))
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        panel = Panel(pad=(18, 18, 18, 18), spacing=12)
+        panel.add_widget(txt(title, 22, bold=True))
+        panel.add_widget(txt(desc, 12, color=HINT))
 
         for t in ORDER:
-            box.add_widget(self.row(t, data[t]))
-        scroll.add_widget(box)
-        root.add_widget(scroll)
+            panel.add_widget(txt(f"{t} {data[t]}", 15, bold=True))
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None),
+                height=dp(40), spacing=dp(4),
+            )
+            self.chips[t] = []
+            for n in range(1, 8):
+                chip = Chip(
+                    n,
+                    on_select=lambda num, key=t: self._pick(key, num),
+                    selected=(n == 4),
+                )
+                self.chips[t].append(chip)
+                row.add_widget(chip)
+            panel.add_widget(row)
 
-        root.add_widget(
-            action_button("下一步", lambda: self.on_done(dict(self.values)))
-        )
+        panel.add_widget(spacer(4))
+        panel.add_widget(Pill("下一步", lambda: self.on_done(dict(self.values))))
 
-        self.add_widget(root)
+        content.add_widget(panel)
+        scroll.add_widget(content)
+        self.add_widget(scroll)
 
-    def row(self, type_key, label):
-        holder = MDBoxLayout(
-            orientation="vertical",
-            size_hint=(1, None),
-            height=dp(64),
-            spacing=dp(0),
-        )
-        top = MDBoxLayout(
-            orientation="horizontal", size_hint=(1, None), height=dp(24)
-        )
-        top.add_widget(txt(f"{type_key} {label}", 13))
-        value_label = txt("4", 13, color=TEAL, bold=True, halign="right")
-        top.add_widget(value_label)
-        holder.add_widget(top)
-
-        slider = MDSlider(
-            min=1, max=7, step=1, value=4, size_hint=(1, None),
-            height=dp(36),
-        )
-
-        def changed(widget, value):
-            value_label.text = str(int(value))
-            self.values[type_key] = int(value)
-
-        slider.bind(value=changed)
-        holder.add_widget(slider)
-        return holder
+    def _pick(self, key, number):
+        self.values[key] = number
+        for chip in self.chips[key]:
+            chip.set_selected(chip.number == number)
 
 
 # ---------------------------------------------------------------
@@ -415,61 +511,65 @@ class RatingScreen(MDScreen):
 class HollandResultScreen(MDScreen):
     def __init__(self, app, totals, **kwargs):
         super().__init__(**kwargs)
-        self.app = app
 
         ranking = sorted(ORDER, key=lambda t: (-totals[t], ORDER.index(t)))
         code = "-".join(ranking[:3])
 
         scroll = ScrollView(do_scroll_x=False)
-        root = MDBoxLayout(
-            orientation="vertical",
-            size_hint_y=None,
-            padding=[dp(16), dp(16), dp(16), dp(20)],
-            spacing=dp(8),
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
         )
-        root.bind(minimum_height=root.setter("height"))
+        content.bind(minimum_height=content.setter("height"))
 
-        root.add_widget(txt("霍兰德职业倾向测验", 12, color=HINT, halign="center"))
-        root.add_widget(txt("你的霍兰德代码", 15, color=HINT, halign="center"))
-        root.add_widget(txt(code, 38, bold=True, color=TEAL, halign="center"))
-        root.add_widget(txt("三个字母依次代表最突出的三种兴趣类型", 11, color=HINT, halign="center"))
+        hero = Panel(pad=(20, 24, 20, 22), spacing=8)
+        hero.add_widget(txt("你的霍兰德代码", 13, color=HINT, halign="center"))
+        hero.add_widget(txt(code, 42, bold=True, color=PRIMARY, halign="center"))
+        hero.add_widget(
+            txt("三个字母依次代表最突出的三种兴趣类型", 12, color=HINT, halign="center")
+        )
+        content.add_widget(hero)
 
-        # 六项得分
-        score_card = card(padding=[dp(16), dp(12), dp(16), dp(12)])
+        scores = Panel(pad=(18, 16, 18, 16), spacing=8)
+        scores.add_widget(txt("六维得分", 15, bold=True))
         for t in ORDER:
-            row = MDBoxLayout(
-                orientation="horizontal", size_hint=(1, None), height=dp(34),
-                spacing=dp(8),
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None), height=dp(24),
             )
-            row.add_widget(txt(f"{t} {TYPES[t]['name']}", 12))
+            row.add_widget(txt(f"{t} {TYPES[t]['name']}", 13))
             row.add_widget(
-                txt(f"{totals[t]} 分", 12, color=TEAL, bold=True, halign="right")
+                txt(f"{totals[t]} 分", 12, color=HINT, halign="right")
             )
-            score_card.add_widget(row)
-            score_card.add_widget(Bar(totals[t] / 44 * 100))
-        root.add_widget(score_card)
+            scores.add_widget(row)
+            scores.add_widget(ThinProgress(totals[t] / 44))
+        content.add_widget(scores)
 
-        # 前三名的解释
         for i, t in enumerate(ranking[:3], 1):
             info = TYPES[t]
-            c = card()
-            c.add_widget(txt(f"{i}. {t} {info['name']}", 16, bold=True))
-            c.add_widget(txt(f"特点：{info['traits']}", 12, color=HINT))
-            c.add_widget(txt(f"专业：{info['majors']}", 12, color=HINT))
-            c.add_widget(txt(f"职业：{info['careers']}", 12, color=HINT))
-            root.add_widget(c)
+            card = Panel(pad=(18, 16, 18, 16), spacing=8)
+            card.add_widget(txt(f"{i}. {t} {info['name']}", 17, bold=True))
+            card.add_widget(txt(f"特点：{info['traits']}", 13, color=HINT))
+            card.add_widget(txt(f"专业：{info['majors']}", 13, color=HINT))
+            card.add_widget(txt(f"职业：{info['careers']}", 13, color=HINT))
+            content.add_widget(card)
 
-        root.add_widget(txt("提示：三个字母的组合可以到教材职业索引里查具体职业；"
-                            "分数只代表兴趣倾向，不代表能力高低。", 11, color=HINT))
+        note = Panel(pad=(18, 16, 18, 16), spacing=6)
+        note.add_widget(txt("说明", 14, bold=True))
+        note.add_widget(
+            txt("三个字母的组合可以到教材职业索引里查具体职业；"
+                "分数只代表兴趣倾向，不代表能力高低。", 12, color=HINT)
+        )
+        content.add_widget(note)
 
-        btn_row = MDBoxLayout(spacing=dp(10), size_hint=(1, None), height=dp(46))
-        again = action_button("再测一次", self.app.start_holland, style="outlined")
-        home = action_button("回首页", self.app.go_home)
-        btn_row.add_widget(again)
-        btn_row.add_widget(home)
-        root.add_widget(btn_row)
+        btn_row = BoxLayout(
+            orientation="horizontal", size_hint=(1, None),
+            height=dp(48), spacing=dp(10),
+        )
+        btn_row.add_widget(Pill("再测一次", app.start_holland, kind="outline"))
+        btn_row.add_widget(Pill("回首页", app.go_home))
+        content.add_widget(btn_row)
 
-        scroll.add_widget(root)
+        scroll.add_widget(content)
         self.add_widget(scroll)
 
 
@@ -484,64 +584,46 @@ class MbtiQuestionScreen(MDScreen):
         total = len(MBTI_ITEMS)
         question, a_text, a_letter, b_text, b_letter = MBTI_ITEMS[index]
 
-        root = MDBoxLayout(
-            orientation="vertical",
-            padding=[dp(18), dp(16), dp(18), dp(16)],
-            spacing=dp(10),
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
         )
-        root.add_widget(txt(f"第 {index + 1} / {total} 题", 11, color=HINT, halign="right"))
-        root.add_widget(Bar(index / total * 100))
+        content.bind(minimum_height=content.setter("height"))
 
-        root.add_widget(Label(size_hint_y=None, height=dp(10)))
-        root.add_widget(txt(question, 20, bold=True))
-        root.add_widget(Label(size_hint_y=None, height=dp(6)))
+        panel = Panel(pad=(18, 18, 18, 18), spacing=12)
+        panel.add_widget(ThinProgress(index / total))
+        panel.add_widget(
+            txt(f"{index + 1} / {total}", 12, color=HINT, halign="right")
+        )
+        panel.add_widget(txt("请选择更符合你的一项", 12, color=HINT))
+        panel.add_widget(txt(question, 20, bold=True))
+        panel.add_widget(spacer(2))
 
-        root.add_widget(self.option("A", a_text, lambda: self.app.answer_mbti(a_letter)))
-        root.add_widget(self.option("B", b_text, lambda: self.app.answer_mbti(b_letter)))
-        root.add_widget(Label())
-
-        back = action_button("返回首页", self.app.go_home, style="text", height=dp(40))
-        root.add_widget(back)
-
-        self.add_widget(root)
-
-    def option(self, letter, text, callback):
-        c = TapCard(
-            on_tap=callback,
-            orientation="horizontal",
-            padding=[dp(12), dp(8), dp(14), dp(8)],
-            spacing=dp(10),
-            size_hint=(1, None),
-            height=dp(64),
-            radius=[dp(14)],
-            style="elevated",
+        panel.add_widget(
+            OptionRow(
+                a_text,
+                on_select=lambda: self.app.answer_mbti(a_letter),
+                letter="A",
+            )
+        )
+        panel.add_widget(
+            OptionRow(
+                b_text,
+                on_select=lambda: self.app.answer_mbti(b_letter),
+                letter="B",
+            )
         )
 
-        badge = Label(
-            text=letter,
-            font_size="20sp",
-            bold=True,
-            color=TEAL,
-            halign="center",
-            valign="middle",
-            size_hint=(None, 1),
-            width=dp(28),
+        panel.add_widget(spacer(6))
+        panel.add_widget(
+            Pill("返回首页", self.app.go_home, kind="text", height=dp(42),
+                 font_size=14)
         )
-        badge.bind(size=lambda w, v: setattr(w, "text_size", v))
 
-        body = Label(
-            text=text,
-            font_size="14sp",
-            color=TEXT,
-            halign="left",
-            valign="middle",
-            size_hint_y=1,
-        )
-        body.bind(size=lambda w, v: setattr(w, "text_size", (v[0], None)))
-
-        c.add_widget(badge)
-        c.add_widget(body)
-        return c
+        content.add_widget(panel)
+        scroll.add_widget(content)
+        self.add_widget(scroll)
 
 
 # ---------------------------------------------------------------
@@ -550,7 +632,6 @@ class MbtiQuestionScreen(MDScreen):
 class MbtiResultScreen(MDScreen):
     def __init__(self, app, counts, **kwargs):
         super().__init__(**kwargs)
-        self.app = app
 
         letters = []
         for left, right in DIMENSIONS:
@@ -559,25 +640,28 @@ class MbtiResultScreen(MDScreen):
         traits, careers = MBTI_TYPES[mbti]
 
         scroll = ScrollView(do_scroll_x=False)
-        root = MDBoxLayout(
-            orientation="vertical",
-            size_hint_y=None,
-            padding=[dp(16), dp(16), dp(16), dp(20)],
-            spacing=dp(8),
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
         )
-        root.bind(minimum_height=root.setter("height"))
+        content.bind(minimum_height=content.setter("height"))
 
-        root.add_widget(txt("MBTI 职业性格测试", 12, color=HINT, halign="center"))
-        root.add_widget(txt("你的性格类型", 15, color=HINT, halign="center"))
-        root.add_widget(txt(mbti, 40, bold=True, color=TEAL, halign="center"))
+        hero = Panel(pad=(20, 24, 20, 22), spacing=8)
+        hero.add_widget(txt("你的性格类型", 13, color=HINT, halign="center"))
+        hero.add_widget(txt(mbti, 44, bold=True, color=PRIMARY, halign="center"))
+        hero.add_widget(
+            txt("四个字母分别代表四个维度的偏好", 12, color=HINT, halign="center")
+        )
+        content.add_widget(hero)
 
-        dim_card = card()
+        dims = Panel(pad=(18, 16, 18, 16), spacing=10)
+        dims.add_widget(txt("维度倾向", 15, bold=True))
         for left, right in DIMENSIONS:
-            row = MDBoxLayout(
-                orientation="horizontal", size_hint=(1, None), height=dp(30)
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None), height=dp(26)
             )
             row.add_widget(
-                txt(f"{left} {DIM_NAMES[left]}", 12,
+                txt(f"{left} {DIM_NAMES[left]}", 13,
                     bold=counts[left] >= counts[right])
             )
             row.add_widget(
@@ -585,49 +669,329 @@ class MbtiResultScreen(MDScreen):
                     halign="center")
             )
             row.add_widget(
-                txt(f"{DIM_NAMES[right]} {right}", 12,
-                    halign="right", bold=counts[right] > counts[left])
+                txt(f"{DIM_NAMES[right]} {right}", 13, halign="right",
+                    bold=counts[right] > counts[left])
             )
-            dim_card.add_widget(row)
-        root.add_widget(dim_card)
+            dims.add_widget(row)
+        content.add_widget(dims)
 
-        info = card()
-        info.add_widget(txt("典型特征", 15, bold=True))
-        info.add_widget(txt(traits, 12, color=HINT))
-        info.add_widget(txt("适合职业", 15, bold=True))
-        info.add_widget(txt(careers, 12, color=HINT))
-        root.add_widget(info)
+        traits_card = Panel(pad=(18, 16, 18, 16), spacing=8)
+        traits_card.add_widget(txt("典型特征", 15, bold=True))
+        traits_card.add_widget(txt(traits, 13, color=HINT))
+        content.add_widget(traits_card)
 
-        root.add_widget(txt("提示：MBTI 测的是偏好，不是能力；换个心情再测，结果可能变化。",
-                            11, color=HINT))
+        careers_card = Panel(pad=(18, 16, 18, 16), spacing=8)
+        careers_card.add_widget(txt("适合职业", 15, bold=True))
+        careers_card.add_widget(txt(careers, 13, color=HINT))
+        content.add_widget(careers_card)
 
-        btn_row = MDBoxLayout(spacing=dp(10), size_hint=(1, None), height=dp(46))
-        again = action_button("再测一次", self.app.start_mbti, style="outlined")
-        home = action_button("回首页", self.app.go_home)
-        btn_row.add_widget(again)
-        btn_row.add_widget(home)
-        root.add_widget(btn_row)
+        note = Panel(pad=(18, 16, 18, 16), spacing=6)
+        note.add_widget(txt("说明", 14, bold=True))
+        note.add_widget(
+            txt("MBTI 测的是偏好，不是能力；换个心情再测，结果可能变化。",
+                12, color=HINT)
+        )
+        content.add_widget(note)
 
-        scroll.add_widget(root)
+        btn_row = BoxLayout(
+            orientation="horizontal", size_hint=(1, None),
+            height=dp(48), spacing=dp(10),
+        )
+        btn_row.add_widget(Pill("再测一次", app.start_mbti, kind="outline"))
+        btn_row.add_widget(Pill("回首页", app.go_home))
+        content.add_widget(btn_row)
+
+        scroll.add_widget(content)
         self.add_widget(scroll)
 
 
 # ---------------------------------------------------------------
-# 主程序：状态与流程
+# SBTI：人格测试（内容与算法来自 B 站 SBTI 页面）
+# ---------------------------------------------------------------
+class Badge(BoxLayout):
+    """浅绿底的小标签。"""
+
+    def __init__(self, label, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            size_hint=(1, None),
+            padding=[dp(14), dp(10), dp(14), dp(10)],
+            **kwargs,
+        )
+        with self.canvas.before:
+            Color(*SOFT)
+            self._bg = RoundedRectangle(radius=[dp(14)])
+        self.bind(pos=self._sync, size=self._sync)
+        self.add_widget(txt(label, 13, color=PRIMARY, bold=True))
+        self.bind(minimum_height=self.setter("height"))
+
+    def _sync(self, *args):
+        self._bg.pos = self.pos
+        self._bg.size = self.size
+        self._bg.radius = [dp(14)]
+
+
+class SbtiQuestionBlock(BoxLayout):
+    """SBTI 单题：元信息 + 题干 + 选项。"""
+
+    def __init__(self, question, on_answer, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            size_hint=(1, None),
+            spacing=dp(8),
+            **kwargs,
+        )
+        self.qid = question["id"]
+        self.options = question["options"]
+        self.on_answer = on_answer
+        self.value = None
+        self.rows = []
+
+        self.add_widget(txt("维度已隐藏", 11, color=HINT))
+        self.add_widget(txt(question["text"], 17, bold=True))
+        for opt in self.options:
+            row = OptionRow(
+                opt["label"],
+                on_select=lambda v=opt["value"]: self._pick(v),
+            )
+            self.rows.append(row)
+            self.add_widget(row)
+
+        self.bind(minimum_height=self.setter("height"))
+
+    def _pick(self, value):
+        self.value = value
+        for row, opt in zip(self.rows, self.options):
+            row.set_selected(opt["value"] == value)
+        self.on_answer(self.qid, value)
+
+
+class SbtiIntroScreen(MDScreen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+
+        root = BoxLayout(
+            orientation="vertical",
+            padding=[dp(18), dp(24), dp(18), dp(18)],
+        )
+        hero = Panel(pad=(22, 26, 22, 22), spacing=14)
+        hero.add_widget(txt("MBTI 已经过时，\nSBTI 来了。", 26, bold=True,
+                            halign="center"))
+        hero.add_widget(
+            txt("31 道题，测出你不太正经的那一面", 13, color=HINT, halign="center")
+        )
+        hero.add_widget(spacer(6))
+        hero.add_widget(Pill("开始测试", app.start_sbti_test))
+        hero.add_widget(
+            txt("题目与结果均来自 B 站 SBTI 玩具，仅供娱乐", 11, color=HINT,
+                halign="center")
+        )
+
+        root.add_widget(hero)
+        root.add_widget(Label())
+        root.add_widget(
+            txt("SBTI 结果不具备任何科学效力，别当真", 11, color=HINT,
+                halign="center")
+        )
+        self.add_widget(root)
+
+
+class SbtiTestScreen(MDScreen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.answers = {}
+        self.blocks = {}
+        self.extra_added = False
+
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        self.panel = Panel(pad=(18, 18, 18, 18), spacing=10)
+        self.bar = ThinProgress(0)
+        self.panel.add_widget(self.bar)
+        self.count_label = txt("0 / 31", 12, color=HINT, halign="right")
+        self.panel.add_widget(self.count_label)
+
+        base = list(SBTI_QUESTIONS) + [SBTI_SPECIAL["drink_gate_q1"]]
+        for q in base:
+            block = SbtiQuestionBlock(q, self._answer)
+            self.blocks[q["id"]] = block
+            self.panel.add_widget(block)
+
+        self.hint = txt("", 12, color=PRIMARY, halign="center")
+        self.panel.add_widget(self.hint)
+        self.panel.add_widget(Pill("提交并查看结果", self._submit))
+
+        content.add_widget(self.panel)
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+    def _visible_count(self):
+        return 31 + (1 if self.extra_added else 0)
+
+    def _answer(self, qid, value):
+        self.answers[qid] = value
+
+        if qid == "drink_gate_q1" and value == 3 and not self.extra_added:
+            self.extra_added = True
+            q = SBTI_SPECIAL["drink_gate_q2"]
+            block = SbtiQuestionBlock(q, self._answer)
+            self.blocks[q["id"]] = block
+            gate1 = self.blocks["drink_gate_q1"]
+            self.panel.add_widget(block, index=self.panel.children.index(gate1))
+
+        self._update_progress()
+
+    def _update_progress(self):
+        total = self._visible_count()
+        answered = len([k for k in self.answers if k in self.blocks])
+        self.bar.value = min(1.0, answered / total)
+        self.count_label.text = f"{answered} / {total}"
+        if answered >= total:
+            self.hint.text = "全答完了，提交吧"
+        else:
+            self.hint.text = ""
+
+    def _submit(self):
+        total = self._visible_count()
+        missing = total - len([k for k in self.answers if k in self.blocks])
+        if missing > 0:
+            self.hint.text = f"还有 {missing} 题没答"
+            return
+        self.app.show(SbtiResultScreen(self.app, sbti_compute(self.answers)))
+
+
+class SbtiResultScreen(MDScreen):
+    def __init__(self, app, result, **kwargs):
+        super().__init__(**kwargs)
+        t = result["type"]
+
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        hero = Panel(pad=(20, 24, 20, 22), spacing=8)
+        hero.add_widget(txt(result["kicker"], 12, color=HINT, halign="center"))
+        hero.add_widget(txt(t["cn"], 36, bold=True, halign="center"))
+        hero.add_widget(txt(t["code"], 15, bold=True, color=PRIMARY,
+                            halign="center"))
+        hero.add_widget(txt(t["intro"], 13, color=HINT, halign="center"))
+        content.add_widget(hero)
+
+        meta = Panel(pad=(18, 16, 18, 16), spacing=10)
+        meta.add_widget(Badge(result["badge"]))
+        meta.add_widget(txt(result["sub"], 12, color=HINT))
+        content.add_widget(meta)
+
+        desc = Panel(pad=(18, 16, 18, 16), spacing=8)
+        desc.add_widget(txt("该人格的简单解读", 15, bold=True))
+        desc.add_widget(txt(t["desc"], 13, color=HINT))
+        content.add_widget(desc)
+
+        dims = Panel(pad=(18, 16, 18, 16), spacing=10)
+        dims.add_widget(txt("十五维度评分", 15, bold=True))
+        for d in SBTI_DIMS:
+            level = result["levels"][d]
+            name = SBTI_DIM_META[d]["name"]
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None), height=dp(24)
+            )
+            row.add_widget(txt(name, 13, bold=True))
+            row.add_widget(txt(level, 13, bold=True, color=PRIMARY,
+                               halign="right"))
+            dims.add_widget(row)
+            dims.add_widget(
+                txt(result["explanations"][d], 12, color=HINT)
+            )
+        content.add_widget(dims)
+
+        btn_row = BoxLayout(
+            orientation="horizontal", size_hint=(1, None),
+            height=dp(48), spacing=dp(10),
+        )
+        btn_row.add_widget(Pill("再测一次", app.start_sbti_test, kind="outline"))
+        btn_row.add_widget(Pill("回首页", app.go_home))
+        content.add_widget(btn_row)
+
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+
+def sbti_compute(answers):
+    """按原页面算法计算：15 维等级 → 模式 → 距离最小的人格。"""
+    totals = {d: 0 for d in SBTI_DIMS}
+    for q in SBTI_QUESTIONS:
+        totals[q["dim"]] += int(answers.get(q["id"], 0))
+
+    levels = {}
+    for d in SBTI_DIMS:
+        s = totals[d]
+        levels[d] = "L" if s <= 3 else ("M" if s == 4 else "H")
+
+    vec = [SBTI_LEVEL[levels[d]] for d in SBTI_DIMS]
+
+    best = None
+    for t in SBTI_TYPES:
+        pattern = [SBTI_LEVEL[c] for c in t["pattern"].replace("-", "")]
+        dist = sum(abs(a - b) for a, b in zip(vec, pattern))
+        exact = sum(1 for a, b in zip(vec, pattern) if a == b)
+        sim = max(0, round(100 * (1 - dist / 30)))
+        key = (dist, -exact, -sim)
+        if best is None or key < best[0]:
+            best = (key, t, dist, exact, sim)
+
+    _, t, dist, exact, sim = best
+    kicker = "你的主类型"
+    badge = f"匹配度 {sim}% · 精准命中 {exact}/15 维"
+    sub = "维度命中度较高，当前结果可视为你的第一人格画像。"
+    final = t
+
+    if answers.get("drink_gate_q2") == 2:
+        final = SBTI["drunk"]
+        kicker = "隐藏人格已激活"
+        badge = "匹配度 100% · 酒精异常因子已接管"
+        sub = "乙醇亲和性过强，系统已直接跳过常规人格审判。"
+    elif sim < 60:
+        final = SBTI["fallback"]
+        kicker = "系统强制兜底"
+        badge = f"标准人格库最高匹配仅 {sim}%"
+        sub = "标准人格库对你的脑回路集体罢工了，于是系统把你强制分配给了 HHHH。"
+
+    explanations = {d: SBTI_EXPL[d][levels[d]] for d in SBTI_DIMS}
+
+    return {
+        "type": final,
+        "levels": levels,
+        "explanations": explanations,
+        "kicker": kicker,
+        "badge": badge,
+        "sub": sub,
+        "similarity": sim,
+    }
+
+
+# ---------------------------------------------------------------
+# 主程序
 # ---------------------------------------------------------------
 class CareerApp(MDApp):
     def build(self):
         self.title = "职业测评"
-        self.theme_cls.primary_palette = "Teal"
+        self.theme_cls.primary_palette = "Green"
         self.theme_cls.theme_style = "Light"
 
-        # 手机上不需要（也不能）指定窗口大小
         if platform not in ("android", "ios"):
             Window.size = (400, 680)
         Window.clearcolor = BG
 
         self.sm = MDScreenManager()
-        # 安卓上淡入淡出转场偶尔会把界面搞崩，直接不用转场
         self.sm.transition = NoTransition()
         self._nav = 0
 
@@ -642,13 +1006,7 @@ class CareerApp(MDApp):
         self._swap(HomeScreen(self))
         return self.sm
 
-    # ---------- 导航 ----------
     def show(self, screen):
-        """切换屏幕。
-
-        延后一帧再切：触摸/按钮事件还在派发时就把当前屏幕删掉，
-        在安卓上容易导致闪退（桌面版一般没事）。
-        """
         Clock.schedule_once(lambda dt: self._swap(screen), 0)
 
     def _swap(self, screen):
@@ -663,13 +1021,11 @@ class CareerApp(MDApp):
             self._show_error(traceback.format_exc())
 
     def _show_error(self, text):
-        """把异常显示在屏幕上，方便截图反馈。"""
         try:
             screen = MDScreen()
-            box = MDBoxLayout(
+            box = BoxLayout(
                 orientation="vertical",
-                padding=[dp(14), dp(14), dp(14), dp(14)],
-                spacing=dp(8),
+                padding=[dp(14), dp(14), dp(14), dp(14)], spacing=dp(8),
             )
             box.add_widget(txt("出错了，请把这一页截图发给开发者", 16, bold=True))
             scroll = ScrollView(do_scroll_x=False)
@@ -683,7 +1039,7 @@ class CareerApp(MDApp):
                 valign="top",
                 size_hint_y=None,
                 adaptive_height=True,
-                text_size=(self.sm.width - dp(28), None) if self.sm.width else (300, None),
+                text_size=(300, None),
             )
             scroll.add_widget(content)
             box.add_widget(scroll)
@@ -699,7 +1055,6 @@ class CareerApp(MDApp):
             pass
 
     def _on_keyboard(self, window, key, *args):
-        """安卓返回键：不在首页就回首页，在首页就交给系统退出。"""
         if key == 27:
             current = self.sm.current_screen if self.sm.screens else None
             if isinstance(current, HomeScreen):
@@ -716,24 +1071,20 @@ class CareerApp(MDApp):
         self.holland = {p["key"]: {} for p in PARTS}
         self.holland["能力"] = {}
         self.holland["技能"] = {}
-        self.holland_steps = [
-            (part, t) for part in PARTS for t in ORDER
-        ]
+        self.holland_steps = [(part, t) for part in PARTS for t in ORDER]
         self.holland_index = 0
         self.show_checklist()
 
     def show_checklist(self):
         part, t = self.holland_steps[self.holland_index]
         self.show(
-            ChecklistScreen(
-                self, part, t, self.holland_index, len(self.holland_steps)
-            )
+            ChecklistScreen(self, part, t, self.holland_index,
+                            len(self.holland_steps))
         )
 
     def submit_checklist(self, part_key, t, count):
         self.holland[part_key][t] = count
         self.holland_index += 1
-
         if self.holland_index < len(self.holland_steps):
             self.show_checklist()
         else:
@@ -742,11 +1093,9 @@ class CareerApp(MDApp):
     def show_ratings(self):
         self.show(
             RatingScreen(
-                self,
-                "表 A · 能力自评",
+                self, "表 A · 能力自评",
                 "和同龄人比一比，给自己六项能力打分（1~7，越大越强）",
-                ABILITY,
-                self.finish_ability,
+                ABILITY, self.finish_ability,
             )
         )
 
@@ -754,21 +1103,27 @@ class CareerApp(MDApp):
         self.holland["能力"] = values
         self.show(
             RatingScreen(
-                self,
-                "表 B · 技能自评",
+                self, "表 B · 技能自评",
                 "再给自己的六项技能打分（1~7）",
-                SKILL,
-                self.finish_skill,
+                SKILL, self.finish_skill,
             )
         )
 
     def finish_skill(self, values):
         self.holland["技能"] = values
         totals = {
-            t: sum(self.holland[p][t] for p in ("兴趣", "擅长", "喜欢", "能力", "技能"))
+            t: sum(self.holland[p][t]
+                   for p in ("兴趣", "擅长", "喜欢", "能力", "技能"))
             for t in ORDER
         }
         self.show(HollandResultScreen(self, totals))
+
+    # ---------- SBTI ----------
+    def start_sbti(self):
+        self.show(SbtiIntroScreen(self))
+
+    def start_sbti_test(self):
+        self.show(SbtiTestScreen(self))
 
     # ---------- MBTI ----------
     def start_mbti(self):

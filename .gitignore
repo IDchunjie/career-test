@@ -18,3 +18,9 @@ new_apk/
 new_apk.zip
 v3/
 dist/
+dev_show.py
+sbti_shots/
+sbti*.html
+sbti*.js
+sbti_shot.png
+dev_flow.py
