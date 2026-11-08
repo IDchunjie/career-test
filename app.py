@@ -50,6 +50,10 @@ DIM_NAMES = DATA["dim_names"]
 with open(os.path.join(BASE_DIR, "career_index.json"), encoding="utf-8") as f:
     CAREER_INDEX = json.load(f)
 
+# 多元智能：8 个维度
+with open(os.path.join(BASE_DIR, "mi_data.json"), encoding="utf-8") as f:
+    MI = json.load(f)
+
 # SBTI 数据（题目 / 15 维度 / 25 种人格 / 解释）
 with open(os.path.join(BASE_DIR, "sbti_data.json"), encoding="utf-8") as f:
     SBTI = json.load(f)
@@ -88,7 +92,7 @@ WHITE = (1, 1, 1, 1)
 
 def txt(text, size=15, color=TEXT, bold=False, halign="left"):
     """自适应高度的中文标签。"""
-    return MDLabel(
+    lbl = MDLabel(
         text=text,
         font_size=f"{size}sp",
         theme_font_size="Custom",
@@ -100,6 +104,12 @@ def txt(text, size=15, color=TEXT, bold=False, halign="left"):
         adaptive_height=True,
         size_hint_y=None,
     )
+
+    def _sync_width(widget, value):
+        widget.text_size = (value, None)
+
+    lbl.bind(width=_sync_width)
+    return lbl
 
 
 def spacer(h=8):
@@ -235,7 +245,7 @@ class OptionRow(ButtonBehavior, BoxLayout):
 
         self.bind(pos=self._sync, size=self._sync)
 
-        label_text = f"{letter}. {text}" if letter else text
+        label_text = f"{letter}.{text}" if letter else text
         self._label = txt(label_text, 15, color=TEXT)
         self._label.bind(height=self._relayout)
         self.add_widget(self._label)
@@ -243,6 +253,16 @@ class OptionRow(ButtonBehavior, BoxLayout):
         self._relayout()
         # 布局稳定后再画一次，避免最后一行圆圈停在中间态坐标
         Clock.schedule_once(lambda dt: self._sync(), 0)
+        Clock.schedule_once(self._fix_text, 0.05)
+        Clock.schedule_once(self._fix_text, 0.25)
+
+    def _fix_text(self, dt=None):
+        """宽限期后强制按当前宽度重排文字（长文本首次排版可能用了旧宽度）。"""
+        try:
+            self._label.text_size = (self._label.width, None)
+            self._label.texture_update()
+        except Exception:
+            pass
 
     def _relayout(self, *args):
         self.height = max(dp(self.MIN_H), self._label.height + dp(20))
@@ -460,6 +480,7 @@ class HomeScreen(MDScreen):
         hero.add_widget(Pill("霍兰德职业倾向测验", app.start_holland))
         hero.add_widget(Pill("MBTI 职业性格测试", app.start_mbti, kind="outline"))
         hero.add_widget(Pill("SBTI 人格测试", app.start_sbti, kind="outline"))
+        hero.add_widget(Pill("多元智能测试", app.start_mi, kind="outline"))
         hero.add_widget(
             Pill("历史记录", app.show_history, kind="text",
                  height=dp(38), font_size=13)
@@ -512,7 +533,7 @@ class ChecklistScreen(MDScreen):
 
         for i, item in enumerate(part["items"][type_key], 1):
             row = OptionRow(
-                f"{i}. {item}",
+                f"{i}.{item}",
                 on_select=lambda idx=i: self._toggle(idx),
             )
             self.rows[i] = row
@@ -1142,6 +1163,146 @@ def sbti_compute(answers):
 
 
 # ---------------------------------------------------------------
+# 多元智能
+# ---------------------------------------------------------------
+class MIGroupScreen(MDScreen):
+    def __init__(self, app, index, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.index = index
+        self.dim = MI["dims"][index]
+        self.checked = set()
+        self.rows = {}
+
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        panel = Panel(pad=(18, 18, 18, 18), spacing=12)
+        panel.add_widget(ThinProgress(index / len(MI["dims"])))
+        panel.add_widget(
+            txt(f"第 {index + 1} / {len(MI['dims'])} 组", 12, color=HINT, halign="right")
+        )
+        panel.add_widget(txt(self.dim["name"], 22, bold=True))
+        panel.add_widget(txt("选中符合你的描述，可以多选", 12, color=HINT))
+
+        for i, q in enumerate(self.dim["questions"], 1):
+            row = OptionRow(
+                f"{i}.{q}",
+                on_select=lambda idx=i: self._toggle(idx),
+            )
+            self.rows[i] = row
+            panel.add_widget(row)
+
+        panel.add_widget(spacer(4))
+        panel.add_widget(
+            Pill("下一组" if index + 1 < len(MI["dims"]) else "查看结果", self._next)
+        )
+
+        content.add_widget(panel)
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+    def _toggle(self, idx):
+        row = self.rows[idx]
+        if idx in self.checked:
+            self.checked.discard(idx)
+            row.set_selected(False)
+        else:
+            self.checked.add(idx)
+            row.set_selected(True)
+
+    def _next(self):
+        self.app.submit_mi(self.index, len(self.checked))
+
+
+class MIResultScreen(MDScreen):
+    def __init__(self, app, scores, **kwargs):
+        super().__init__(**kwargs)
+
+        dims = MI["dims"]
+        ranking = sorted(
+            dims, key=lambda d: (-scores.get(d["key"], 0), dims.index(d))
+        )
+        top = ranking[:3]
+
+        app.add_history(
+            "mi", "多元智能测试",
+            "优势：" + "、".join(d["name"] for d in top),
+        )
+        self._share_text = (
+            "我的多元智能优势：" + "、".join(d["name"] for d in top) + "\n"
+            + "，".join(f"{d['name']}{scores.get(d['key'], 0)}分" for d in dims)
+        )
+
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        hero = Panel(pad=(20, 24, 20, 22), spacing=8)
+        hero.add_widget(txt("你的优势智能", 13, color=HINT, halign="center"))
+        hero.add_widget(
+            txt("、".join(d["short"] for d in top), 30, bold=True,
+                color=PRIMARY, halign="center")
+        )
+        hero.add_widget(
+            txt("八个维度里最突出的三项", 12, color=HINT, halign="center")
+        )
+        content.add_widget(hero)
+
+        bars = Panel(pad=(18, 16, 18, 16), spacing=8)
+        bars.add_widget(txt("八维得分", 15, bold=True))
+        for d in dims:
+            row = BoxLayout(
+                orientation="horizontal", size_hint=(1, None), height=dp(24)
+            )
+            row.add_widget(txt(d["name"], 13, bold=(d in top)))
+            row.add_widget(
+                txt(f"{scores.get(d['key'], 0)} / 6", 12, color=HINT,
+                    halign="right")
+            )
+            bars.add_widget(row)
+            bars.add_widget(ThinProgress(scores.get(d["key"], 0) / 6))
+        content.add_widget(bars)
+
+        for i, d in enumerate(top, 1):
+            card = Panel(pad=(18, 16, 18, 16), spacing=8)
+            card.add_widget(txt(f"{i}. {d['name']}", 17, bold=True))
+            card.add_widget(txt(d["desc"], 13, color=HINT))
+            card.add_widget(txt(f"适合方向：{d['careers']}", 13, color=HINT))
+            content.add_widget(card)
+
+        note = Panel(pad=(18, 16, 18, 16), spacing=6)
+        note.add_widget(txt("说明", 14, bold=True))
+        note.add_widget(
+            txt("多元智能不是“智商”，每个人都有自己的强项组合，"
+                "结果只作参考。", 12, color=HINT)
+        )
+        content.add_widget(note)
+
+        btn_row = BoxLayout(
+            orientation="horizontal", size_hint=(1, None),
+            height=dp(48), spacing=dp(10),
+        )
+        btn_row.add_widget(Pill("再测一次", app.start_mi, kind="outline"))
+        btn_row.add_widget(Pill("回首页", app.go_home))
+        content.add_widget(btn_row)
+        content.add_widget(
+            Pill("复制结果", lambda: Clipboard.copy(self._share_text),
+                 kind="text", height=dp(38), font_size=13)
+        )
+
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+
+# ---------------------------------------------------------------
 # 主程序
 # ---------------------------------------------------------------
 class CareerApp(MDApp):
@@ -1166,6 +1327,8 @@ class CareerApp(MDApp):
         self.sbti_answers = {}
         self.sbti_extra = False
         self.sbti_index = 0
+        self.mi_scores = {}
+        self.mi_index = 0
 
         Window.bind(on_keyboard=self._on_keyboard)
 
@@ -1371,6 +1534,23 @@ class CareerApp(MDApp):
             SbtiQuestionScreen(self, self.sbti_index, len(qs),
                                qs[self.sbti_index], self.sbti_answers)
         )
+
+    # ---------- 多元智能 ----------
+    def start_mi(self):
+        self.mi_scores = {}
+        self.mi_index = 0
+        self.show_mi_group()
+
+    def show_mi_group(self):
+        self.show(MIGroupScreen(self, self.mi_index))
+
+    def submit_mi(self, index, count):
+        self.mi_scores[MI["dims"][index]["key"]] = count
+        self.mi_index = index + 1
+        if self.mi_index < len(MI["dims"]):
+            self.show_mi_group()
+        else:
+            self.show(MIResultScreen(self, self.mi_scores))
 
     # ---------- MBTI ----------
     def start_mbti(self):
