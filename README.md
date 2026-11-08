@@ -1,25 +1,30 @@
-# 职业测评 APP
+# 职业测评 APP（v1.3）
 
-霍兰德职业倾向测验（教材原版 180 题）+ MBTI 职业性格测试（28 题），
-用 Python + Kivy + KivyMD 写成的手机/电脑两用界面。
+四个测试：霍兰德职业倾向测验（教材原版 180 题）、MBTI 职业性格测试（28 题）、
+SBTI 人格测试（31 题，内容与算法取自 B 站同款玩具）、多元智能（8 维度 48 题）。
+用 Python + Kivy + KivyMD 写成，手机 / 电脑通用。
 
-## 界面预览
+## 功能
 
-| 首页 | 答题页 | 霍兰德结果 | MBTI 结果 |
-|---|---|---|---|
-| ![](preview/01_home.png) | ![](preview/02_checklist.png) | ![](preview/03_holland_result.png) | ![](preview/04_mbti_result.png) |
+- 四个测试，结果页都带维度得分明细
+- 职业索引：教材 72 个三字母代码 → 具体职业
+- 历史记录：结果自动存本机，最近 50 条
+- 复制结果：一键复制文字报告到剪贴板
+- 保存海报：生成竖版结果图，存到手机文件目录
+- 断点续答：霍兰德 / SBTI 中途退出可继续
 
 ## 目录
 
 | 文件 | 作用 |
 |---|---|
 | `app.py` | 主程序（界面 + 流程） |
-| `data.json` | 题库数据（从霍兰德量表导出） |
+| `data.json` | 霍兰德题库（从教材量表导出） |
+| `sbti_data.json` | SBTI 题库、15 维度、25 种人格 |
+| `mi_data.json` | 多元智能 8 维度题库 |
+| `career_index.json` | 教材职业索引（72 个代码） |
 | `启动.bat` | 双击运行（调用 py -3.13） |
-| `dist/CareerTest.exe` | 打包好的 Windows 程序，双击即用，不用装 Python |
-| `console_version.py` | 最早的控制台版，纯文字答题 |
-| `mini_result.py` / `mini_screens.py` | 开发时单独预览某个页面，可删 |
-| `test_drive.py` / `drive_slow.py` | 开发时自动翻页巡检，可删 |
+| `dist/CareerTest.exe` | Windows 程序，双击即用 |
+| `dist/career-test-v1.3.apk` | 安卓安装包（真机验证可用） |
 
 ## 电脑上运行
 
