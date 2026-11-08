@@ -46,6 +46,10 @@ MBTI_TYPES = DATA["mbti_types"]
 DIMENSIONS = DATA["dimensions"]
 DIM_NAMES = DATA["dim_names"]
 
+# 教材职业索引：三字母代码 -> 职业
+with open(os.path.join(BASE_DIR, "career_index.json"), encoding="utf-8") as f:
+    CAREER_INDEX = json.load(f)
+
 # SBTI 数据（题目 / 15 维度 / 25 种人格 / 解释）
 with open(os.path.join(BASE_DIR, "sbti_data.json"), encoding="utf-8") as f:
     SBTI = json.load(f)
@@ -669,14 +673,32 @@ class HollandResultScreen(MDScreen):
             card.add_widget(txt(f"职业：{info['careers']}", 13, color=HINT))
             content.add_widget(card)
 
+        code_key = "".join(ranking[:3])
+        jobs = CAREER_INDEX.get(code_key)
+        idx_panel = Panel(pad=(18, 16, 18, 16), spacing=8)
+        idx_panel.add_widget(txt(f"职业索引 · {code_key}", 15, bold=True))
+        if jobs:
+            idx_panel.add_widget(txt("、".join(jobs), 13, color=HINT))
+            idx_panel.add_widget(
+                txt("来自教材职业索引，这里只列了其中一部分", 11, color=HINT)
+            )
+        else:
+            lines = [f"{t} 类：{TYPES[t]['careers']}" for t in ranking[:3]]
+            idx_panel.add_widget(
+                txt("该组合暂未收录，可参考三个类型的典型职业：", 12, color=HINT)
+            )
+            idx_panel.add_widget(txt("；".join(lines), 12, color=HINT))
+        if jobs:
+            self._share_text += "\n职业索引：" + "、".join(jobs)
+        content.add_widget(idx_panel)
+
         note = Panel(pad=(18, 16, 18, 16), spacing=6)
         note.add_widget(txt("说明", 14, bold=True))
         note.add_widget(
-            txt("三个字母的组合可以到教材职业索引里查具体职业；"
-                "分数只代表兴趣倾向，不代表能力高低。", 12, color=HINT)
+            txt("代码只代表兴趣倾向，不代表能力高低，也不是“只能干这些”。",
+                12, color=HINT)
         )
         content.add_widget(note)
-
         btn_row = BoxLayout(
             orientation="horizontal", size_hint=(1, None),
             height=dp(48), spacing=dp(10),
