@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 寮€鍙戠敤锛氳嚜鍔ㄨ蛋涓€閬嶆墍鏈夐〉闈㈠苟鎴浘锛屾鏌ユ湁娌℃湁鐢婚敊銆佹姤閿欍€?涓嶅弬涓庢渶缁?APP锛屽彧鏄垜鑷繁鐢ㄧ殑宸℃鑴氭湰銆?"""
 
@@ -6,7 +6,7 @@ import os
 import sys
 
 os.environ.setdefault("KIVY_NO_ARGS", "1")
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from kivy.clock import Clock
 from kivy.core.window import Window

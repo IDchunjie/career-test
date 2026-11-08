@@ -5,7 +5,7 @@ import os
 import sys
 
 os.environ.setdefault("KIVY_NO_ARGS", "1")
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from kivy.clock import Clock
 from kivy.core.window import Window

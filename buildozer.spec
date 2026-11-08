@@ -5,8 +5,7 @@ package.domain = org.example
 
 source.dir = .
 source.include_exts = py,json,otf,png,jpg
-source.exclude_dirs = preview,dist,build,bin,.git,.github,__pycache__,shots,sbti_shots,v3,v4,new_apk,apk_out,logs_extract
-source.exclude_patterns = test_drive.py, drive_slow.py, mini_result.py, mini_screens.py, console_version.py, dev_show.py, dev_flow.py, dev_tall.py, build_index.py
+source.exclude_dirs = dist,build,bin,.git,.github,__pycache__,docs,dev,tools
 
 version = 1.3
 

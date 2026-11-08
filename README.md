@@ -13,7 +13,20 @@ SBTI 人格测试（31 题，内容与算法取自 B 站同款玩具）、多元
 - 保存海报：生成竖版结果图，存到手机文件目录
 - 断点续答：霍兰德 / SBTI 中途退出可继续
 
-## 目录
+## 目录结构
+
+```
+E:\career_app\
+├─ app.py / main.py / 启动.bat        程序入口
+├─ data.json / sbti_data.json         题库与数据
+├─ mi_data.json / career_index.json
+├─ assets\                            中文字体（Noto Sans SC）
+├─ dist\                              APK 与 exe
+├─ docs\                              日志、预览图、SBTI 网页原始资料
+├─ dev\                               开发用脚本（打包时排除）
+├─ tools\                             网络修复脚本
+└─ .github\ / .ssh\                   云端构建配置、部署密钥
+```
 
 | 文件 | 作用 |
 |---|---|
@@ -22,9 +35,12 @@ SBTI 人格测试（31 题，内容与算法取自 B 站同款玩具）、多元
 | `sbti_data.json` | SBTI 题库、15 维度、25 种人格 |
 | `mi_data.json` | 多元智能 8 维度题库 |
 | `career_index.json` | 教材职业索引（72 个代码） |
-| `启动.bat` | 双击运行（调用 py -3.13） |
 | `dist/CareerTest.exe` | Windows 程序，双击即用 |
 | `dist/career-test-v1.3.apk` | 安卓安装包（真机验证可用） |
+| `docs/开发日志_*.txt` | 开发日志与给未来的备忘 |
+| `docs/preview/` | 界面截图 |
+| `dev/` | 开发脚本（预览、巡检、构建索引） |
+| `tools/` | GitHub 访问修复脚本 |
 
 ## 电脑上运行
 
@@ -69,8 +85,8 @@ E:\tools\PortableGit\cmd\git.exe push -u origin main
 
 ## 安卓安装包（已构建成功，真机验证可用）
 
-`dist/career-test-v3.apk`（37.5 MB，arm64-v8a，debug 签名）
-已在一加 Ace 6 / Android 17 上实测：安装、答题流程正常。
+`dist/career-test-v1.3.apk`（37.5 MB，arm64-v8a，debug 签名）
+已在一加 Ace 6 / Android 17 上实测：四个测试、历史、海报、续答均正常。
 
 - 系统要求：Android 7.0 及以上（minSdk 24），64 位 ARM 手机
 - 安装：先卸载旧版，再装新版（debug 签名每次构建都不同，覆盖安装会失败）
