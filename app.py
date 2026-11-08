@@ -14,7 +14,7 @@ from kivy.clock import Clock
 from kivy.core.clipboard import Clipboard
 from kivy.core.text import LabelBase
 from kivy.core.window import Window
-from kivy.graphics import Color, Ellipse, Line, RoundedRectangle
+from kivy.graphics import Color, Ellipse, Line, Rectangle, RoundedRectangle
 from kivy.metrics import dp
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
@@ -408,6 +408,55 @@ class Chip(ButtonBehavior, BoxLayout):
 
 
 # ---------------------------------------------------------------
+# 分享海报
+# ---------------------------------------------------------------
+class Poster(BoxLayout):
+    """竖版结果海报，导出为 PNG。"""
+
+    def __init__(self, title, big, lines, footer, **kwargs):
+        super().__init__(
+            orientation="vertical",
+            size_hint=(None, None),
+            size=(720, 1080),
+            padding=[dp(64), dp(90), dp(64), dp(60)],
+            spacing=dp(18),
+            **kwargs,
+        )
+
+        with self.canvas.before:
+            Color(*BG)
+            self._bg = Rectangle()
+            Color(*CARD)
+            self._card = RoundedRectangle(radius=[dp(36)])
+            Color(*BORDER)
+            self._line = Line(width=2)
+
+        self.bind(pos=self._sync, size=self._sync)
+
+        self.add_widget(Label())
+        self.add_widget(txt("职业测评", 20, color=HINT, halign="center"))
+        self.add_widget(spacer(10))
+        self.add_widget(txt(title, 24, color=HINT, halign="center"))
+        self.add_widget(txt(big, 54, bold=True, color=PRIMARY, halign="center"))
+        self.add_widget(spacer(10))
+        for line in lines:
+            self.add_widget(txt(line, 18, color=TEXT, halign="center"))
+        self.add_widget(Label())
+        self.add_widget(txt(footer, 15, color=HINT, halign="center"))
+
+    def _sync(self, *args):
+        self._bg.pos = self.pos
+        self._bg.size = self.size
+        self._card.pos = (self.x + dp(24), self.y + dp(24))
+        self._card.size = (self.width - dp(48), self.height - dp(48))
+        self._card.radius = [dp(36)]
+        self._line.rounded_rectangle = (
+            self.x + dp(24), self.y + dp(24),
+            self.width - dp(48), self.height - dp(48), dp(36),
+        )
+
+
+# ---------------------------------------------------------------
 # 历史记录
 # ---------------------------------------------------------------
 class HistoryScreen(MDScreen):
@@ -481,6 +530,19 @@ class HomeScreen(MDScreen):
         hero.add_widget(Pill("MBTI 职业性格测试", app.start_mbti, kind="outline"))
         hero.add_widget(Pill("SBTI 人格测试", app.start_sbti, kind="outline"))
         hero.add_widget(Pill("多元智能测试", app.start_mi, kind="outline"))
+
+        prog = app.load_progress()
+        if prog:
+            hero.add_widget(
+                Pill(
+                    f"继续上次：{prog.get('title', '未完成的测试')}",
+                    app.resume_progress,
+                    kind="text",
+                    height=dp(38),
+                    font_size=13,
+                )
+            )
+
         hero.add_widget(
             Pill("历史记录", app.show_history, kind="text",
                  height=dp(38), font_size=13)
@@ -731,6 +793,21 @@ class HollandResultScreen(MDScreen):
             Pill("复制结果", lambda: Clipboard.copy(self._share_text),
                  kind="text", height=dp(38), font_size=13)
         )
+        index_line = ("职业索引：" + "、".join(jobs)) if jobs else "代码组合可查教材职业索引"
+        content.add_widget(
+            Pill(
+                "保存海报",
+                lambda: app.save_poster(
+                    "霍兰德职业倾向测验",
+                    code,
+                    ["六维得分：" + " · ".join(f"{t}{totals[t]}" for t in ORDER),
+                     index_line],
+                ),
+                kind="text",
+                height=dp(38),
+                font_size=13,
+            )
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -895,6 +972,21 @@ class MbtiResultScreen(MDScreen):
         content.add_widget(
             Pill("复制结果", lambda: Clipboard.copy(self._share_text),
                  kind="text", height=dp(38), font_size=13)
+        )
+        content.add_widget(
+            Pill(
+                "保存海报",
+                lambda: app.save_poster(
+                    "MBTI 职业性格测试",
+                    mbti,
+                    ["维度比例：" + " · ".join(
+                        f"{left}{counts[left]}:{counts[right]}{right}"
+                        for left, right in DIMENSIONS)],
+                ),
+                kind="text",
+                height=dp(38),
+                font_size=13,
+            )
         )
 
         scroll.add_widget(content)
@@ -1104,6 +1196,19 @@ class SbtiResultScreen(MDScreen):
             Pill("复制结果", lambda: Clipboard.copy(self._share_text),
                  kind="text", height=dp(38), font_size=13)
         )
+        content.add_widget(
+            Pill(
+                "保存海报",
+                lambda: app.save_poster(
+                    "SBTI 人格测试",
+                    f"{t['cn']} {t['code']}",
+                    [result["badge"], t["intro"]],
+                ),
+                kind="text",
+                height=dp(38),
+                font_size=13,
+            )
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -1297,6 +1402,21 @@ class MIResultScreen(MDScreen):
             Pill("复制结果", lambda: Clipboard.copy(self._share_text),
                  kind="text", height=dp(38), font_size=13)
         )
+        content.add_widget(
+            Pill(
+                "保存海报",
+                lambda: app.save_poster(
+                    "多元智能测试",
+                    "、".join(d["short"] for d in top),
+                    ["八维得分：" + " · ".join(
+                        f"{d['short']}{scores.get(d['key'], 0)}"
+                        for d in dims)],
+                ),
+                kind="text",
+                height=dp(38),
+                font_size=13,
+            )
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -1434,6 +1554,113 @@ class CareerApp(MDApp):
     def show_history(self):
         self.show(HistoryScreen(self))
 
+    # ---------- 分享海报 ----------
+    def _poster_dir(self):
+        if platform == "android":
+            try:
+                from jnius import autoclass
+
+                act = autoclass("org.kivy.android.PythonActivity").mActivity
+                ext = act.getExternalFilesDir(None)
+                if ext is not None:
+                    return str(ext.getAbsolutePath())
+            except Exception:
+                pass
+        return self.user_data_dir
+
+    def save_poster(self, title, big, lines):
+        screen = self.sm.current_screen
+        footer = time.strftime("%Y-%m-%d") + " · 职业测评 APP"
+        poster = Poster(title, big, lines, footer)
+        poster.pos = (-6000, -6000)
+        screen.add_widget(poster)
+
+        def do_export(dt):
+            try:
+                d = self._poster_dir()
+                os.makedirs(d, exist_ok=True)
+                path = os.path.join(
+                    d, "career_poster_" + time.strftime("%Y%m%d_%H%M%S") + ".png"
+                )
+                poster.export_to_png(path)
+                self._toast("海报已保存：\n" + path)
+            except Exception as e:
+                self._toast("保存失败：" + str(e))
+            finally:
+                try:
+                    screen.remove_widget(poster)
+                except Exception:
+                    pass
+
+        Clock.schedule_once(do_export, 0.4)
+
+    def _toast(self, text):
+        from kivy.uix.popup import Popup
+
+        box = BoxLayout(orientation="vertical", padding=dp(16), spacing=dp(10))
+        box.add_widget(txt(text, 13, halign="center"))
+        popup = Popup(
+            title="提示", content=box, size_hint=(0.85, None), height=dp(250)
+        )
+        box.add_widget(Pill("知道了", popup.dismiss, height=dp(44)))
+        popup.open()
+
+    # ---------- 断点续答 ----------
+    def _progress_path(self):
+        return os.path.join(self.user_data_dir, "progress.json")
+
+    def load_progress(self):
+        try:
+            with open(self._progress_path(), encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) and data.get("kind") else None
+        except Exception:
+            return None
+
+    def save_progress(self, kind, title, index, state):
+        try:
+            os.makedirs(self.user_data_dir, exist_ok=True)
+            with open(self._progress_path(), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "kind": kind,
+                        "title": title,
+                        "index": index,
+                        "state": state,
+                        "time": time.strftime("%Y-%m-%d %H:%M"),
+                    },
+                    f,
+                    ensure_ascii=False,
+                )
+        except Exception:
+            pass
+
+    def clear_progress(self):
+        try:
+            os.remove(self._progress_path())
+        except Exception:
+            pass
+
+    def resume_progress(self):
+        prog = self.load_progress()
+        if not prog:
+            return
+        kind = prog.get("kind")
+        state = prog.get("state") or {}
+        if kind == "sbti":
+            self.sbti_answers = state.get("answers") or {}
+            self.sbti_extra = bool(state.get("extra"))
+            self.sbti_index = int(prog.get("index") or 0)
+            self.show_sbti_question()
+        elif kind == "holland":
+            self.holland = state.get("holland") or {}
+            self.holland_index = int(prog.get("index") or 0)
+            self.holland_steps = [(part, t) for part in PARTS for t in ORDER]
+            if self.holland_index < len(self.holland_steps):
+                self.show_checklist()
+            else:
+                self.show_ratings()
+
     # ---------- 霍兰德 ----------
     def start_holland(self):
         self.holland = {p["key"]: {} for p in PARTS}
@@ -1441,6 +1668,8 @@ class CareerApp(MDApp):
         self.holland["技能"] = {}
         self.holland_steps = [(part, t) for part in PARTS for t in ORDER]
         self.holland_index = 0
+        self.save_progress("holland", "霍兰德职业倾向测验", 0,
+                           {"holland": self.holland})
         self.show_checklist()
 
     def show_checklist(self):
@@ -1453,6 +1682,8 @@ class CareerApp(MDApp):
     def submit_checklist(self, part_key, t, count):
         self.holland[part_key][t] = count
         self.holland_index += 1
+        self.save_progress("holland", "霍兰德职业倾向测验",
+                           self.holland_index, {"holland": self.holland})
         if self.holland_index < len(self.holland_steps):
             self.show_checklist()
         else:
@@ -1479,6 +1710,7 @@ class CareerApp(MDApp):
 
     def finish_skill(self, values):
         self.holland["技能"] = values
+        self.clear_progress()
         totals = {
             t: sum(self.holland[p][t]
                    for p in ("兴趣", "擅长", "喜欢", "能力", "技能"))
@@ -1500,6 +1732,8 @@ class CareerApp(MDApp):
         self.sbti_answers = {}
         self.sbti_extra = False
         self.sbti_index = 0
+        self.save_progress("sbti", "SBTI 人格测试", 0,
+                           {"answers": {}, "extra": False})
         self.show_sbti_question()
 
     def show_sbti_question(self):
@@ -1518,11 +1752,15 @@ class CareerApp(MDApp):
         nxt = self.sbti_index + 1
         if nxt < len(qs):
             self.sbti_index = nxt
+            self.save_progress("sbti", "SBTI 人格测试", nxt,
+                               {"answers": self.sbti_answers,
+                                "extra": self.sbti_extra})
             self.show(
                 SbtiQuestionScreen(self, nxt, len(qs), qs[nxt],
                                    self.sbti_answers)
             )
         else:
+            self.clear_progress()
             self.show(SbtiResultScreen(self, sbti_compute(self.sbti_answers)))
 
     def sbti_back(self):
@@ -1530,6 +1768,9 @@ class CareerApp(MDApp):
             return
         self.sbti_index -= 1
         qs = self.sbti_question_list()
+        self.save_progress("sbti", "SBTI 人格测试", self.sbti_index,
+                           {"answers": self.sbti_answers,
+                            "extra": self.sbti_extra})
         self.show(
             SbtiQuestionScreen(self, self.sbti_index, len(qs),
                                qs[self.sbti_index], self.sbti_answers)
