@@ -417,7 +417,7 @@ class Poster(BoxLayout):
         super().__init__(
             orientation="vertical",
             size_hint=(None, None),
-            size=(720, 1080),
+            size=(dp(720), dp(1080)),
             padding=[dp(64), dp(90), dp(64), dp(60)],
             spacing=dp(18),
             **kwargs,
@@ -523,7 +523,8 @@ class HomeScreen(MDScreen):
         hero = Panel(pad=(22, 26, 22, 22), spacing=14)
         hero.add_widget(txt("职业测评", 32, bold=True, halign="center"))
         hero.add_widget(
-            txt("霍兰德 · MBTI · SBTI 三个测试", 13, color=HINT, halign="center")
+            txt("霍兰德 · MBTI · SBTI · 多元智能 四个测试", 13, color=HINT,
+                halign="center")
         )
         hero.add_widget(spacer(6))
         hero.add_widget(Pill("霍兰德职业倾向测验", app.start_holland))
