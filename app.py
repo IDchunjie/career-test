@@ -7,9 +7,11 @@
 
 import json
 import os
+import time
 import traceback
 
 from kivy.clock import Clock
+from kivy.core.clipboard import Clipboard
 from kivy.core.text import LabelBase
 from kivy.core.window import Window
 from kivy.graphics import Color, Ellipse, Line, RoundedRectangle
@@ -382,6 +384,58 @@ class Chip(ButtonBehavior, BoxLayout):
 
 
 # ---------------------------------------------------------------
+# 历史记录
+# ---------------------------------------------------------------
+class HistoryScreen(MDScreen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+
+        scroll = ScrollView(do_scroll_x=False)
+        content = BoxLayout(
+            orientation="vertical", size_hint_y=None,
+            padding=[dp(16), dp(16), dp(16), dp(20)], spacing=dp(12),
+        )
+        content.bind(minimum_height=content.setter("height"))
+
+        header = Panel(pad=(18, 18, 18, 18), spacing=8)
+        header.add_widget(txt("历史记录", 22, bold=True))
+        header.add_widget(txt("最近 50 条，保存在本机", 12, color=HINT))
+        content.add_widget(header)
+
+        hist = app.load_history()
+        if not hist:
+            empty = Panel(pad=(18, 16, 18, 16), spacing=6)
+            empty.add_widget(txt("还没有记录", 15, bold=True))
+            empty.add_widget(txt("先去做一个测试吧", 13, color=HINT))
+            content.add_widget(empty)
+        else:
+            for rec in hist:
+                card = Panel(pad=(16, 14, 16, 14), spacing=6)
+                row = BoxLayout(
+                    orientation="horizontal", size_hint=(1, None),
+                    height=dp(22),
+                )
+                row.add_widget(txt(rec.get("title", ""), 14, bold=True))
+                row.add_widget(
+                    txt(rec.get("time", ""), 11, color=HINT, halign="right")
+                )
+                card.add_widget(row)
+                card.add_widget(txt(rec.get("summary", ""), 12, color=HINT))
+                content.add_widget(card)
+
+        btn_row = BoxLayout(
+            orientation="horizontal", size_hint=(1, None),
+            height=dp(48), spacing=dp(10),
+        )
+        btn_row.add_widget(Pill("清空记录", app.clear_history, kind="outline"))
+        btn_row.add_widget(Pill("回首页", app.go_home))
+        content.add_widget(btn_row)
+
+        scroll.add_widget(content)
+        self.add_widget(scroll)
+
+
+# ---------------------------------------------------------------
 # 首页
 # ---------------------------------------------------------------
 class HomeScreen(MDScreen):
@@ -402,6 +456,10 @@ class HomeScreen(MDScreen):
         hero.add_widget(Pill("霍兰德职业倾向测验", app.start_holland))
         hero.add_widget(Pill("MBTI 职业性格测试", app.start_mbti, kind="outline"))
         hero.add_widget(Pill("SBTI 人格测试", app.start_sbti, kind="outline"))
+        hero.add_widget(
+            Pill("历史记录", app.show_history, kind="text",
+                 height=dp(38), font_size=13)
+        )
         hero.add_widget(
             txt("在手机上完成约需 10 分钟", 12, color=HINT, halign="center")
         )
@@ -541,6 +599,15 @@ class HollandResultScreen(MDScreen):
         ranking = sorted(ORDER, key=lambda t: (-totals[t], ORDER.index(t)))
         code = "-".join(ranking[:3])
 
+        app.add_history(
+            "holland", "霍兰德职业倾向测验",
+            f"代码 {code} · " + " ".join(f"{t}{totals[t]}" for t in ORDER),
+        )
+        self._share_text = (
+            f"我的霍兰德职业倾向测验结果：{code}\n"
+            + "，".join(f"{t} {TYPES[t]['name']} {totals[t]} 分" for t in ORDER)
+        )
+
         scroll = ScrollView(do_scroll_x=False)
         content = BoxLayout(
             orientation="vertical", size_hint_y=None,
@@ -617,6 +684,10 @@ class HollandResultScreen(MDScreen):
         btn_row.add_widget(Pill("再测一次", app.start_holland, kind="outline"))
         btn_row.add_widget(Pill("回首页", app.go_home))
         content.add_widget(btn_row)
+        content.add_widget(
+            Pill("复制结果", lambda: Clipboard.copy(self._share_text),
+                 kind="text", height=dp(38), font_size=13)
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -687,6 +758,12 @@ class MbtiResultScreen(MDScreen):
             letters.append(left if counts[left] >= counts[right] else right)
         mbti = "".join(letters)
         traits, careers = MBTI_TYPES[mbti]
+
+        app.add_history(
+            "mbti", "MBTI 职业性格测试",
+            f"{mbti} · " + " ".join(f"{k}{counts[k]}" for k in "EISNTFJP"),
+        )
+        self._share_text = f"我的 MBTI 类型是 {mbti}"
 
         scroll = ScrollView(do_scroll_x=False)
         content = BoxLayout(
@@ -772,6 +849,10 @@ class MbtiResultScreen(MDScreen):
         btn_row.add_widget(Pill("再测一次", app.start_mbti, kind="outline"))
         btn_row.add_widget(Pill("回首页", app.go_home))
         content.add_widget(btn_row)
+        content.add_widget(
+            Pill("复制结果", lambda: Clipboard.copy(self._share_text),
+                 kind="text", height=dp(38), font_size=13)
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -918,6 +999,15 @@ class SbtiResultScreen(MDScreen):
         super().__init__(**kwargs)
         t = result["type"]
 
+        app.add_history(
+            "sbti", "SBTI 人格测试",
+            f"{t['cn']}（{t['code']}）· {result['badge']}",
+        )
+        self._share_text = (
+            f"我的 SBTI 人格是 {t['cn']}（{t['code']}）\n"
+            f"{result['badge']}\n{t['intro']}"
+        )
+
         scroll = ScrollView(do_scroll_x=False)
         content = BoxLayout(
             orientation="vertical", size_hint_y=None,
@@ -967,6 +1057,10 @@ class SbtiResultScreen(MDScreen):
         btn_row.add_widget(Pill("再测一次", app.start_sbti_test, kind="outline"))
         btn_row.add_widget(Pill("回首页", app.go_home))
         content.add_widget(btn_row)
+        content.add_widget(
+            Pill("复制结果", lambda: Clipboard.copy(self._share_text),
+                 kind="text", height=dp(38), font_size=13)
+        )
 
         scroll.add_widget(content)
         self.add_widget(scroll)
@@ -1115,6 +1209,45 @@ class CareerApp(MDApp):
 
     def go_home(self):
         self.show(HomeScreen(self))
+
+    # ---------- 历史记录 ----------
+    def _history_path(self):
+        return os.path.join(self.user_data_dir, "history.json")
+
+    def load_history(self):
+        try:
+            with open(self._history_path(), encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    def add_history(self, kind, title, summary):
+        try:
+            rec = {
+                "kind": kind,
+                "title": title,
+                "time": time.strftime("%Y-%m-%d %H:%M"),
+                "summary": summary,
+            }
+            hist = self.load_history()
+            hist.insert(0, rec)
+            hist = hist[:50]
+            os.makedirs(self.user_data_dir, exist_ok=True)
+            with open(self._history_path(), "w", encoding="utf-8") as f:
+                json.dump(hist, f, ensure_ascii=False, indent=1)
+        except Exception:
+            pass
+
+    def clear_history(self):
+        try:
+            os.remove(self._history_path())
+        except Exception:
+            pass
+        self.show(HistoryScreen(self))
+
+    def show_history(self):
+        self.show(HistoryScreen(self))
 
     # ---------- 霍兰德 ----------
     def start_holland(self):
