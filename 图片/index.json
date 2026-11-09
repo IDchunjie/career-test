@@ -1,0 +1,213 @@
+{
+  "说明": "MBTI 与 SBTI 人格图片索引；file 为同目录下的图片文件名。",
+  "mbti": {
+    "INTJ": {
+      "file": "MBTI-INTJ.png",
+      "cn": "建筑师",
+      "group": "NT",
+      "group_cn": "分析家"
+    },
+    "INTP": {
+      "file": "MBTI-INTP.png",
+      "cn": "逻辑学家",
+      "group": "NT",
+      "group_cn": "分析家"
+    },
+    "ENTJ": {
+      "file": "MBTI-ENTJ.png",
+      "cn": "指挥官",
+      "group": "NT",
+      "group_cn": "分析家"
+    },
+    "ENTP": {
+      "file": "MBTI-ENTP.png",
+      "cn": "辩论家",
+      "group": "NT",
+      "group_cn": "分析家"
+    },
+    "INFJ": {
+      "file": "MBTI-INFJ.png",
+      "cn": "提倡者",
+      "group": "NF",
+      "group_cn": "外交家"
+    },
+    "INFP": {
+      "file": "MBTI-INFP.png",
+      "cn": "调停者",
+      "group": "NF",
+      "group_cn": "外交家"
+    },
+    "ENFJ": {
+      "file": "MBTI-ENFJ.png",
+      "cn": "主人公",
+      "group": "NF",
+      "group_cn": "外交家"
+    },
+    "ENFP": {
+      "file": "MBTI-ENFP.png",
+      "cn": "竞选者",
+      "group": "NF",
+      "group_cn": "外交家"
+    },
+    "ISTJ": {
+      "file": "MBTI-ISTJ.png",
+      "cn": "物流师",
+      "group": "SJ",
+      "group_cn": "守护者"
+    },
+    "ISFJ": {
+      "file": "MBTI-ISFJ.png",
+      "cn": "守卫者",
+      "group": "SJ",
+      "group_cn": "守护者"
+    },
+    "ESTJ": {
+      "file": "MBTI-ESTJ.png",
+      "cn": "总经理",
+      "group": "SJ",
+      "group_cn": "守护者"
+    },
+    "ESFJ": {
+      "file": "MBTI-ESFJ.png",
+      "cn": "执政官",
+      "group": "SJ",
+      "group_cn": "守护者"
+    },
+    "ISTP": {
+      "file": "MBTI-ISTP.png",
+      "cn": "鉴赏家",
+      "group": "SP",
+      "group_cn": "探险家"
+    },
+    "ISFP": {
+      "file": "MBTI-ISFP.png",
+      "cn": "探险家",
+      "group": "SP",
+      "group_cn": "探险家"
+    },
+    "ESTP": {
+      "file": "MBTI-ESTP.png",
+      "cn": "企业家",
+      "group": "SP",
+      "group_cn": "探险家"
+    },
+    "ESFP": {
+      "file": "MBTI-ESFP.png",
+      "cn": "表演者",
+      "group": "SP",
+      "group_cn": "探险家"
+    }
+  },
+  "sbti": {
+    "CTRL": {
+      "file": "SBTI-CTRL.png",
+      "cn": "拿捏者"
+    },
+    "ATM-er": {
+      "file": "SBTI-ATM-er.png",
+      "cn": "送钱者"
+    },
+    "Dior-s": {
+      "file": "SBTI-Dior-s.jpg",
+      "cn": "雕丝"
+    },
+    "BOSS": {
+      "file": "SBTI-BOSS.png",
+      "cn": "领导者"
+    },
+    "THAN-K": {
+      "file": "SBTI-THAN-K.png",
+      "cn": "感恩者"
+    },
+    "OH-NO": {
+      "file": "SBTI-OH-NO.png",
+      "cn": "哦不人"
+    },
+    "GOGO": {
+      "file": "SBTI-GOGO.png",
+      "cn": "行人"
+    },
+    "SEXY": {
+      "file": "SBTI-SEXY.png",
+      "cn": "尤物"
+    },
+    "LOVE-R": {
+      "file": "SBTI-LOVE-R.png",
+      "cn": "多情者"
+    },
+    "MUM": {
+      "file": "SBTI-MUM.png",
+      "cn": "妈妈"
+    },
+    "FAKE": {
+      "file": "SBTI-FAKE.png",
+      "cn": "伪人"
+    },
+    "OG8K": {
+      "file": "SBTI-OG8K.png",
+      "cn": "无所谓人"
+    },
+    "MALO": {
+      "file": "SBTI-MALO.png",
+      "cn": "吗喽"
+    },
+    "JOKE-R": {
+      "file": "SBTI-JOKE-R.jpg",
+      "cn": "小丑"
+    },
+    "WOC!": {
+      "file": "SBTI-WOC.png",
+      "cn": "握草人"
+    },
+    "THIN-K": {
+      "file": "SBTI-THIN-K.png",
+      "cn": "思考者"
+    },
+    "SHIT": {
+      "file": "SBTI-SHIT.png",
+      "cn": "愤世者"
+    },
+    "ZZZZ": {
+      "file": "SBTI-ZZZZ.png",
+      "cn": "装死者"
+    },
+    "POOR": {
+      "file": "SBTI-POOR.png",
+      "cn": "贫困者"
+    },
+    "MONK": {
+      "file": "SBTI-MONK.png",
+      "cn": "僧人"
+    },
+    "IMSB": {
+      "file": "SBTI-IMSB.png",
+      "cn": "傻者"
+    },
+    "SOLO": {
+      "file": "SBTI-SOLO.png",
+      "cn": "孤儿"
+    },
+    "FU?K": {
+      "file": "SBTI-FU-K.png",
+      "cn": "草者"
+    },
+    "DEAD": {
+      "file": "SBTI-DEAD.png",
+      "cn": "死者"
+    },
+    "IMFW": {
+      "file": "SBTI-IMFW.png",
+      "cn": "废物"
+    },
+    "HHHH": {
+      "file": "SBTI-HHHH.png",
+      "cn": "傻乐者",
+      "note": "兜底/彩蛋人格（第一人格匹配率不足时触发）"
+    },
+    "DRUNK": {
+      "file": "SBTI-DRUNK.png",
+      "cn": "酒鬼",
+      "note": "彩蛋人格（饮酒支线触发）"
+    }
+  }
+}

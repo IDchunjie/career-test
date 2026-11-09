@@ -7,7 +7,7 @@ source.dir = .
 source.include_exts = py,json,otf,png,jpg
 source.exclude_dirs = dist,build,bin,.git,.github,__pycache__,docs,dev,tools
 
-version = 1.3
+version = 1.4
 
 # KivyMD 2.0 在安卓上不需要 materialshapes（那是 LoadingIndicator 用的），
 # 所以这里不列 pycairo，避免触发它的本地编译。

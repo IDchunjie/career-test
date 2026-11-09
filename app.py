@@ -18,6 +18,7 @@ from kivy.graphics import Color, Ellipse, Line, Rectangle, RoundedRectangle
 from kivy.metrics import dp
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.image import Image as KivyImage
 from kivy.uix.label import Label
 from kivy.uix.screenmanager import NoTransition
 from kivy.uix.scrollview import ScrollView
@@ -53,6 +54,29 @@ with open(os.path.join(BASE_DIR, "career_index.json"), encoding="utf-8") as f:
 # 多元智能：8 个维度
 with open(os.path.join(BASE_DIR, "mi_data.json"), encoding="utf-8") as f:
     MI = json.load(f)
+
+# 人格图片索引（MBTI / SBTI）
+IMG_DIR = os.path.join(BASE_DIR, "图片")
+try:
+    with open(os.path.join(IMG_DIR, "index.json"), encoding="utf-8") as f:
+        PERSONA_IMG = json.load(f)
+except Exception:
+    PERSONA_IMG = {}
+
+
+def persona_image(kind, code):
+    """按人格代码取图片路径，取不到返回 None。"""
+    try:
+        info = (PERSONA_IMG.get(kind) or {}).get(code)
+        if not info:
+            return None
+        path = os.path.join(IMG_DIR, info.get("file", ""))
+        if os.path.exists(path):
+            return path
+        alt = os.path.join(IMG_DIR, info.get("file", "").replace("?", "-"))
+        return alt if os.path.exists(alt) else None
+    except Exception:
+        return None
 
 # SBTI 数据（题目 / 15 维度 / 25 种人格 / 解释）
 with open(os.path.join(BASE_DIR, "sbti_data.json"), encoding="utf-8") as f:
@@ -896,6 +920,12 @@ class MbtiResultScreen(MDScreen):
         hero = Panel(pad=(20, 24, 20, 22), spacing=8)
         hero.add_widget(txt("你的性格类型", 13, color=HINT, halign="center"))
         hero.add_widget(txt(mbti, 44, bold=True, color=PRIMARY, halign="center"))
+        img = persona_image("mbti", mbti)
+        if img:
+            hero.add_widget(
+                KivyImage(source=img, size_hint=(1, None), height=dp(170),
+                          allow_stretch=True, keep_ratio=True)
+            )
         hero.add_widget(
             txt("四个字母分别代表四个维度的偏好", 12, color=HINT, halign="center")
         )
@@ -1152,10 +1182,17 @@ class SbtiResultScreen(MDScreen):
         content.bind(minimum_height=content.setter("height"))
 
         hero = Panel(pad=(20, 24, 20, 22), spacing=8)
-        hero.add_widget(txt(result["kicker"], 12, color=HINT, halign="center"))
-        hero.add_widget(txt(t["cn"], 36, bold=True, halign="center"))
-        hero.add_widget(txt(t["code"], 15, bold=True, color=PRIMARY,
-                            halign="center"))
+        hero.add_widget(txt("你的主类型", 12, color=HINT, halign="center"))
+        img = persona_image("sbti", t["code"])
+        if img:
+            hero.add_widget(
+                KivyImage(source=img, size_hint=(1, None), height=dp(240),
+                          allow_stretch=True, keep_ratio=True)
+            )
+        else:
+            hero.add_widget(txt(t["cn"], 36, bold=True, halign="center"))
+            hero.add_widget(txt(t["code"], 15, bold=True, color=PRIMARY,
+                                halign="center"))
         hero.add_widget(txt(t["intro"], 13, color=HINT, halign="center"))
         content.add_widget(hero)
 
