@@ -56,7 +56,7 @@ with open(os.path.join(BASE_DIR, "mi_data.json"), encoding="utf-8") as f:
     MI = json.load(f)
 
 # 人格图片索引（MBTI / SBTI）
-IMG_DIR = os.path.join(BASE_DIR, "图片")
+IMG_DIR = os.path.join(BASE_DIR, "persona_images")
 try:
     with open(os.path.join(IMG_DIR, "index.json"), encoding="utf-8") as f:
         PERSONA_IMG = json.load(f)
