@@ -1,4 +1,4 @@
-# 职业测评 APP（v1.3）
+# 职业测评 APP（v1.5）
 
 四个测试：霍兰德职业倾向测验（教材原版 180 题）、MBTI 职业性格测试（28 题）、
 SBTI 人格测试（31 题，内容与算法取自 B 站同款玩具）、多元智能（8 维度 48 题）。
@@ -11,6 +11,7 @@ SBTI 人格测试（31 题，内容与算法取自 B 站同款玩具）、多元
 - 历史记录：结果自动存本机，最近 50 条
 - 复制结果：一键复制文字报告到剪贴板
 - 保存海报：生成竖版结果图，存到手机文件目录
+- 人格配图：MBTI 16 款、SBTI 27 款角色图
 - 断点续答：霍兰德 / SBTI 中途退出可继续
 
 ## 目录结构
@@ -36,7 +37,7 @@ E:\career_app\
 | `mi_data.json` | 多元智能 8 维度题库 |
 | `career_index.json` | 教材职业索引（72 个代码） |
 | `dist/CareerTest.exe` | Windows 程序，双击即用 |
-| `dist/career-test-v1.3.apk` | 安卓安装包（真机验证可用） |
+| `dist/career-test-v1.5.apk` | 安卓安装包（真机验证可用） |
 | `docs/开发日志_*.txt` | 开发日志与给未来的备忘 |
 | `docs/preview/` | 界面截图 |
 | `dev/` | 开发脚本（预览、巡检、构建索引） |
@@ -85,7 +86,7 @@ E:\tools\PortableGit\cmd\git.exe push -u origin main
 
 ## 安卓安装包（已构建成功，真机验证可用）
 
-`dist/career-test-v1.3.apk`（37.5 MB，arm64-v8a，debug 签名）
+`dist/career-test-v1.5.apk`（37.5 MB，arm64-v8a，debug 签名）
 已在一加 Ace 6 / Android 17 上实测：四个测试、历史、海报、续答均正常。
 
 - 系统要求：Android 7.0 及以上（minSdk 24），64 位 ARM 手机
